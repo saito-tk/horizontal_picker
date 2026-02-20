@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.requiredHeightIn
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.foundation.lazy.LazyRow
@@ -24,6 +25,7 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.progressSemantics
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -46,9 +48,11 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -119,7 +123,9 @@ fun HorizontalPicker(
                 centeredIndex = findCenteredIndex(listState.layoutInfo),
                 isScrolling = listState.isScrollInProgress
             )
-        }.collect { snapshot ->
+        }
+            .distinctUntilChanged()
+            .collect { snapshot ->
             val centered = snapshot.centeredIndex ?: return@collect
 
             if (haptics != null && enabled && snapshot.isScrolling && centered != hapticIndex) {
@@ -273,6 +279,7 @@ data class LabelStyle(
     val enabled: Boolean = true,
     val showEvery: Int = 10,
     val topPadding: Dp = 8.dp,
+    val width: Dp = 48.dp,
     val textStyle: TextStyle = TextStyle.Default,
     val color: Color = Color.Unspecified,
     val formatter: (Float) -> String = { value ->
@@ -386,11 +393,13 @@ private fun PickerTick(
 
         if (showLabel) {
             val textStyle = MaterialTheme.typography.labelSmall.merge(labelStyle.textStyle)
-            BasicText(
+            Text(
                 text = labelStyle.formatter(value),
                 modifier = Modifier
                     .height(20.dp)
-                    .width(tickStyle.spacing * 2),
+                    .requiredWidth(labelStyle.width),
+                textAlign = TextAlign.Center,
+                maxLines = 1,
                 style = textStyle.copy(
                     color = labelStyle.color.orFallback(colorScheme.onSurfaceVariant)
                 )
