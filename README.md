@@ -1,31 +1,33 @@
-# Horizontal Picker (Jetpack Compose)
+# Horizontal Picker for Jetpack Compose
 
-A reusable Jetpack Compose horizontal picker library where users scroll ticks and the value under a fixed center indicator is selected.
+Jetpack Compose 向けの **横スクロール式 Picker ライブラリ**です。  
+中央の固定インジケータに目盛りを合わせて値を選択します。
 
-## Modules
+- Module: `:picker`（ライブラリ）
+- Sample: `:sample`（動作確認アプリ）
+- minSdk: `21+`
 
-- `:picker` - reusable Compose UI library.
-- `:sample` - sample Android app with multiple usage patterns.
+## できること
 
-## Features
+- `LazyRow` ベースの高パフォーマンスな横 picker
+- 中央インジケータ固定 + スナップ挙動
+- `Float` / `Int` API
+- 小 / 中 / 大目盛り（`mediumEvery`, `majorEvery`）
+- ラベル表示・フォーマット
+- インジケータ差し替え
+- haptic フィードバック
+- アクセシビリティ対応（stateDescription / 増減アクション）
+- RTL 対応
 
-- LazyRow-based horizontal picker.
-- Fixed center indicator.
-- Snap-to-nearest tick behavior.
-- Float and Int APIs.
-- Tick hierarchy (minor / medium / major).
-- Optional labels with formatter.
-- Optional haptic feedback when crossing ticks.
-- Accessibility semantics with current value and custom increment/decrement actions.
-- RTL-safe layout using start/end paddings.
+## できないこと（意図的な非対応）
 
-## Non-goals
+- 無限ホイール
+- 非線形スケール（対数など）
+- View システム版（Compose 専用）
 
-- Infinite wheel behavior.
-- Arbitrary non-linear scales (linear stepped values only).
-- View-based implementation (Compose only).
+## インストール
 
-## Installation
+Maven Central に公開する場合の想定座標（雛形）:
 
 ```kotlin
 dependencies {
@@ -33,20 +35,28 @@ dependencies {
 }
 ```
 
-## Basic usage
+ローカルで試す場合は `:picker` を参照:
 
 ```kotlin
-var speed by rememberSaveable { mutableFloatStateOf(50f) }
+dependencies {
+    implementation(project(":picker"))
+}
+```
+
+## 最小使用例（Float）
+
+```kotlin
+var value by rememberSaveable { mutableFloatStateOf(50f) }
 
 HorizontalPicker(
-    value = speed,
-    onValueChange = { speed = it },
-    valueRange = 0f..200f,
+    value = value,
+    onValueChange = { value = it },
+    valueRange = 0f..100f,
     step = 1f
 )
 ```
 
-## Int overload
+## 最小使用例（Int）
 
 ```kotlin
 var age by rememberSaveable { mutableIntStateOf(30) }
@@ -59,7 +69,27 @@ HorizontalPicker(
 )
 ```
 
-## Custom indicator and label formatter
+## 値更新モード（重要）
+
+`valueChangeMode` で「いつ `onValueChange` するか」を選べます。
+
+- `ValueChangeMode.Continuous`
+  - 連続性重視。高速フリングでも 1 刻みで補間更新。
+- `ValueChangeMode.AlignedContinuous`（デフォルト）
+  - 中央線が目盛り中心を通過したタイミングで連続更新。
+  - haptic と体感を揃えやすい。
+- `ValueChangeMode.OnScrollFinished`
+  - スクロール停止時に確定値だけ更新。
+
+## haptic の仕様
+
+- 目盛り中心が中央線を通過したタイミングで発火。
+- 高速スクロール時も通過した tick を補間して発火。
+- プログラム的なスクロール同期中（外部 state 反映）は発火抑制。
+
+## カスタマイズ例
+
+### 1. 目盛りとラベル
 
 ```kotlin
 HorizontalPicker(
@@ -67,19 +97,52 @@ HorizontalPicker(
     onValueChange = { price = it },
     valueRange = 0f..1000f,
     step = 5f,
+    tick = TickStyle(
+        spacing = 10.dp,
+        majorEvery = 10,
+        mediumEvery = 5,
+        majorHeight = 16.dp,
+        mediumHeight = 8.dp,
+        minorHeight = 4.dp
+    ),
+    label = LabelStyle(
+        showEvery = 10,
+        width = 64.dp,
+        formatter = { "${it.toInt()} 円" }
+    )
+)
+```
+
+### 2. インジケータ差し替え
+
+```kotlin
+HorizontalPicker(
+    value = value,
+    onValueChange = { value = it },
+    valueRange = 0f..100f,
+    step = 1f,
     indicator = {
         Box(
             Modifier
                 .align(Alignment.TopCenter)
                 .width(2.dp)
-                .height(48.dp)
+                .height(32.dp)
                 .background(MaterialTheme.colorScheme.error)
         )
-    },
-    label = LabelStyle(
-        showEvery = 10,
-        formatter = { "${it.toInt()}$" }
-    )
+    }
+)
+```
+
+### 3. Integer picker を軽量運用
+
+```kotlin
+HorizontalPicker(
+    value = count,
+    onValueChange = { count = it },
+    range = 0..600,
+    step = 1,
+    valueChangeMode = ValueChangeMode.OnScrollFinished,
+    haptics = null
 )
 ```
 
@@ -93,39 +156,59 @@ fun HorizontalPicker(
     valueRange: ClosedFloatingPointRange<Float>,
     step: Float,
     modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = ...,
-    flingBehavior: FlingBehavior = snapping,
-    indicator: @Composable BoxScope.() -> Unit = defaultCenterIndicator,
-    tick: TickStyle = TickStyle(...),
-    label: LabelStyle = LabelStyle(...),
-    haptics: HapticFeedbackType? = ...,
+    contentPadding: PaddingValues = PaddingValues(vertical = 12.dp),
+    flingBehavior: FlingBehavior = PickerDefaults.SnapFlingBehavior,
+    indicator: @Composable BoxScope.() -> Unit = { DefaultCenterIndicator() },
+    tick: TickStyle = TickStyle(),
+    label: LabelStyle = LabelStyle(),
+    haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
     enabled: Boolean = true,
+    valueChangeMode: ValueChangeMode = ValueChangeMode.AlignedContinuous
+)
+
+@Composable
+fun HorizontalPicker(
+    value: Int,
+    onValueChange: (Int) -> Unit,
+    range: IntRange,
+    step: Int,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(vertical = 12.dp),
+    flingBehavior: FlingBehavior = PickerDefaults.SnapFlingBehavior,
+    indicator: @Composable BoxScope.() -> Unit = { DefaultCenterIndicator() },
+    tick: TickStyle = TickStyle(),
+    label: LabelStyle = LabelStyle(formatter = { it.roundToInt().toString() }),
+    haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
+    enabled: Boolean = true,
+    valueChangeMode: ValueChangeMode = ValueChangeMode.AlignedContinuous
 )
 ```
 
-## Design notes
+## 設計メモ
 
-- Scale: one tick equals one `step`.
-- Centering: picker adds automatic start/end center paddings so the first/last ticks can align with center indicator.
-- Conversion: internal model maps `value <-> index` and uses canonical stepped values to avoid drift.
-- Snap: default fling behavior resolves to `SnapFlingBehavior` per `LazyListState`.
-- Performance: uses `LazyRow(items(count))` to virtualize large ranges (`0..10_000 step 1`), and derives centered index from layout info.
+- 1 tick = 1 step の線形モデル
+- `value <-> index` 変換をライブラリ内で完結
+- 左右パディングを自動補正し、端値も中央に合わせられる
+- `LazyRow` の virtualization を使うため大量 tick でも破綻しにくい
 
-## Testing
+## テスト
 
-- Unit tests (`:picker:test`): value/index conversion and snapping.
-- UI tests (`:picker:connectedAndroidTest`): swipe updates value and final value snaps to step.
+- Unit test: `:picker:test`
+  - 変換ロジック（`valueToIndex`, `indexToValue`, `snapToStep`）
+- UI test: `:picker:connectedAndroidTest`
+  - 値変化 / スナップの最低限確認
 
-## Maven Central publishing template
-
-`picker/build.gradle.kts` already includes:
-
-- `maven-publish` + `signing` plugins.
-- Release publication with sources/javadocs jars.
-- Placeholder POM metadata to replace before publishing.
-
-## Run sample
+## サンプル起動
 
 ```bash
 ./gradlew :sample:installDebug
 ```
+
+## 公開準備（雛形）
+
+`picker/build.gradle.kts` に以下を用意済み:
+
+- `maven-publish`, `signing`
+- sources/javadocs Jar
+- POM メタデータ（要差し替え）
+
