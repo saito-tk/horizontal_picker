@@ -79,7 +79,7 @@ fun HorizontalPicker(
     label: LabelStyle = LabelStyle(),
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
     enabled: Boolean = true,
-    valueChangeMode: ValueChangeMode = ValueChangeMode.Continuous
+    valueChangeMode: ValueChangeMode = ValueChangeMode.AlignedContinuous
 ) {
     val model = remember(valueRange, step) { createPickerModel(valueRange, step) }
     val clampedValue = remember(value, model) { model.snapToStep(value) }
@@ -128,10 +128,13 @@ fun HorizontalPicker(
     }
 
     LaunchedEffect(listState, enabled, valueChangeMode, haptics, isProgrammaticScroll) {
+        var previousCenteredIndexFloat: Float? = null
+
         snapshotFlow {
             val layoutInfo = listState.layoutInfo
             PickerSnapshot(
                 centeredIndex = findCenteredIndex(layoutInfo),
+                centeredIndexFloat = findCenteredIndexFloat(layoutInfo),
                 alignedCenteredIndex = findAlignedCenteredIndex(layoutInfo),
                 isScrolling = listState.isScrollInProgress,
                 isProgrammaticScroll = isProgrammaticScroll
@@ -140,28 +143,48 @@ fun HorizontalPicker(
             .distinctUntilChanged()
             .collect { snapshot ->
             val centered = snapshot.centeredIndex ?: return@collect
+            val centeredFloat = snapshot.centeredIndexFloat
+            val previousFloat = previousCenteredIndexFloat
+            previousCenteredIndexFloat = centeredFloat
+            val crossedIndices = if (previousFloat != null && centeredFloat != null) {
+                crossedAlignedIndices(previousFloat, centeredFloat, model.lastIndex)
+            } else {
+                emptyList()
+            }
 
-            // Fire haptics when a tick is truly aligned with the center indicator.
             val alignedCentered = snapshot.alignedCenteredIndex
             if (
                 haptics != null &&
                 enabled &&
-                !snapshot.isProgrammaticScroll &&
-                alignedCentered != null &&
-                alignedCentered != hapticIndex
+                !snapshot.isProgrammaticScroll
             ) {
-                hapticIndex = alignedCentered
-                hapticFeedback.performHapticFeedback(haptics)
+                if (crossedIndices.isNotEmpty()) {
+                    for (index in crossedIndices) {
+                        if (index != hapticIndex) {
+                            hapticIndex = index
+                            hapticFeedback.performHapticFeedback(haptics)
+                        }
+                    }
+                } else if (alignedCentered != null && alignedCentered != hapticIndex) {
+                    hapticIndex = alignedCentered
+                    hapticFeedback.performHapticFeedback(haptics)
+                }
             }
 
             if (snapshot.isProgrammaticScroll) return@collect
 
             when (valueChangeMode) {
                 ValueChangeMode.Continuous -> {
-                    // Emit only when a tick is actually aligned with the center indicator.
-                    // Keep 1-step continuity even if some aligned frames are skipped.
-                    if (alignedCentered != null) {
-                        for (index in steppedIndices(emittedIndex, alignedCentered)) {
+                    // Keep 1-step continuity even when frames are skipped during fast fling.
+                    for (index in steppedIndices(emittedIndex, centered)) {
+                        emittedIndex = index
+                        onValueChange(model.indexToValue(index))
+                    }
+                }
+                ValueChangeMode.AlignedContinuous -> {
+                    // Emit when center line crosses tick centers even if exact aligned frames are skipped.
+                    for (index in crossedIndices) {
+                        if (index != emittedIndex) {
                             emittedIndex = index
                             onValueChange(model.indexToValue(index))
                         }
@@ -258,7 +281,7 @@ fun HorizontalPicker(
     label: LabelStyle = LabelStyle(formatter = { it.roundToInt().toString() }),
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
     enabled: Boolean = true,
-    valueChangeMode: ValueChangeMode = ValueChangeMode.Continuous
+    valueChangeMode: ValueChangeMode = ValueChangeMode.AlignedContinuous
 ) {
     require(step > 0) { "step must be > 0" }
 
@@ -296,7 +319,18 @@ fun BoxScope.DefaultCenterIndicator(
 
 /** Controls how and when [onValueChange] is called while scrolling. */
 enum class ValueChangeMode {
+    /**
+     * Emits continuously while scrolling based on nearest centered tick.
+     * Best for smooth 1-step continuity during fast flings.
+     */
     Continuous,
+
+    /**
+     * Emits only when a tick is actually aligned with the center indicator.
+     * Can feel less continuous at high velocity.
+     */
+    AlignedContinuous,
+
     OnScrollFinished
 }
 
@@ -342,6 +376,7 @@ object PickerDefaults {
 
 private data class PickerSnapshot(
     val centeredIndex: Int?,
+    val centeredIndexFloat: Float?,
     val alignedCenteredIndex: Int?,
     val isScrolling: Boolean,
     val isProgrammaticScroll: Boolean
@@ -478,6 +513,22 @@ private fun findCenteredIndex(layoutInfo: LazyListLayoutInfo): Int? {
     }?.index
 }
 
+private fun findCenteredIndexFloat(layoutInfo: LazyListLayoutInfo): Float? {
+    val visibleItems = layoutInfo.visibleItemsInfo
+    if (visibleItems.isEmpty()) return null
+
+    val center = (layoutInfo.viewportStartOffset + layoutInfo.viewportEndOffset) / 2f
+    val centeredItem = visibleItems.minByOrNull { item ->
+        abs((item.offset + item.size / 2f) - center)
+    } ?: return null
+
+    if (centeredItem.size == 0) return centeredItem.index.toFloat()
+
+    val centeredItemCenter = centeredItem.offset + centeredItem.size / 2f
+    val offsetInItems = (center - centeredItemCenter) / centeredItem.size.toFloat()
+    return centeredItem.index + offsetInItems
+}
+
 private fun findAlignedCenteredIndex(
     layoutInfo: LazyListLayoutInfo,
     alignmentTolerancePx: Float = 1f
@@ -504,4 +555,26 @@ private fun steppedIndices(fromExclusive: Int, toInclusive: Int): IntProgression
     }
     val step = if (toInclusive > fromExclusive) 1 else -1
     return IntProgression.fromClosedRange(fromExclusive + step, toInclusive, step)
+}
+
+private fun crossedAlignedIndices(from: Float, to: Float, maxIndex: Int): List<Int> {
+    if (from == to) return emptyList()
+
+    return if (to > from) {
+        val start = kotlin.math.floor(from).toInt() + 1
+        val end = kotlin.math.floor(to).toInt()
+        if (end < start) {
+            emptyList()
+        } else {
+            (start..end).map { it.coerceIn(0, maxIndex) }
+        }
+    } else {
+        val start = kotlin.math.ceil(from).toInt() - 1
+        val end = kotlin.math.ceil(to).toInt()
+        if (start < end) {
+            emptyList()
+        } else {
+            (start downTo end).map { it.coerceIn(0, maxIndex) }
+        }
+    }
 }
