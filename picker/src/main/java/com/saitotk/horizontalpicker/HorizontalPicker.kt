@@ -248,8 +248,8 @@ fun BoxScope.DefaultCenterIndicator(
     Box(
         modifier = modifier
             .align(Alignment.TopCenter)
-            .width(3.dp)
-            .height(48.dp)
+            .width(4.dp)
+            .height(26.dp)
             .background(color, RoundedCornerShape(percent = 50))
     )
 }
@@ -264,9 +264,9 @@ enum class ValueChangeMode {
 data class TickStyle(
     val spacing: Dp = 12.dp,
     val thickness: Dp = 2.dp,
-    val minorHeight: Dp = 16.dp,
-    val mediumHeight: Dp = 24.dp,
-    val majorHeight: Dp = 32.dp,
+    val minorHeight: Dp = 4.dp,
+    val mediumHeight: Dp = 8.dp,
+    val majorHeight: Dp = 16.dp,
     val minorColor: Color = Color.Unspecified,
     val mediumColor: Color = Color.Unspecified,
     val majorColor: Color = Color.Unspecified,
