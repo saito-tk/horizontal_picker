@@ -53,7 +53,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun SampleScreen() {
-    var integerValue by rememberSaveable { mutableIntStateOf(50) }
+    var integerValue by rememberSaveable { mutableIntStateOf(0) }
     var floatValue by rememberSaveable { mutableFloatStateOf(37.5f) }
     var customValue by rememberSaveable { mutableFloatStateOf(500f) }
 

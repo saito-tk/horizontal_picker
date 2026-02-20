@@ -32,6 +32,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -95,6 +96,7 @@ fun HorizontalPicker(
 
     var emittedIndex by remember(model) { mutableIntStateOf(targetIndex) }
     var hapticIndex by remember(model) { mutableIntStateOf(targetIndex) }
+    var isProgrammaticScroll by remember(model) { mutableStateOf(false) }
 
     val selectedIndex by remember(listState, targetIndex) {
         derivedStateOf {
@@ -106,41 +108,66 @@ fun HorizontalPicker(
     LaunchedEffect(targetIndex) {
         val currentCentered = findCenteredIndex(listState.layoutInfo)
         if (currentCentered == null) {
+            isProgrammaticScroll = true
             listState.scrollToItem(targetIndex)
             emittedIndex = targetIndex
             hapticIndex = targetIndex
+            isProgrammaticScroll = false
             return@LaunchedEffect
         }
 
         if (!listState.isScrollInProgress && currentCentered != targetIndex) {
-            listState.animateScrollToItem(targetIndex)
+            isProgrammaticScroll = true
+            try {
+                listState.animateScrollToItem(targetIndex)
+            } finally {
+                isProgrammaticScroll = false
+            }
         }
     }
 
-    LaunchedEffect(listState, enabled, valueChangeMode, haptics) {
+    LaunchedEffect(listState, enabled, valueChangeMode, haptics, isProgrammaticScroll) {
         snapshotFlow {
+            val layoutInfo = listState.layoutInfo
             PickerSnapshot(
-                centeredIndex = findCenteredIndex(listState.layoutInfo),
-                isScrolling = listState.isScrollInProgress
+                centeredIndex = findCenteredIndex(layoutInfo),
+                alignedCenteredIndex = findAlignedCenteredIndex(layoutInfo),
+                isScrolling = listState.isScrollInProgress,
+                isProgrammaticScroll = isProgrammaticScroll
             )
         }
             .distinctUntilChanged()
             .collect { snapshot ->
             val centered = snapshot.centeredIndex ?: return@collect
 
-            if (haptics != null && enabled && snapshot.isScrolling && centered != hapticIndex) {
-                hapticIndex = centered
+            // Fire haptics when a tick is truly aligned with the center indicator.
+            val alignedCentered = snapshot.alignedCenteredIndex
+            if (
+                haptics != null &&
+                enabled &&
+                !snapshot.isProgrammaticScroll &&
+                alignedCentered != null &&
+                alignedCentered != hapticIndex
+            ) {
+                hapticIndex = alignedCentered
                 hapticFeedback.performHapticFeedback(haptics)
             }
 
-            val shouldEmit = when (valueChangeMode) {
-                ValueChangeMode.Continuous -> centered != emittedIndex
-                ValueChangeMode.OnScrollFinished -> !snapshot.isScrolling && centered != emittedIndex
+            val emitIndex = when (valueChangeMode) {
+                // Emit only when a tick is actually aligned to center.
+                ValueChangeMode.Continuous -> alignedCentered
+                ValueChangeMode.OnScrollFinished -> {
+                    if (!snapshot.isScrolling) alignedCentered ?: centered else null
+                }
             }
 
-            if (shouldEmit) {
-                emittedIndex = centered
-                onValueChange(model.indexToValue(centered))
+            if (
+                !snapshot.isProgrammaticScroll &&
+                emitIndex != null &&
+                emitIndex != emittedIndex
+            ) {
+                emittedIndex = emitIndex
+                onValueChange(model.indexToValue(emitIndex))
             }
         }
     }
@@ -302,7 +329,9 @@ object PickerDefaults {
 
 private data class PickerSnapshot(
     val centeredIndex: Int?,
-    val isScrolling: Boolean
+    val alignedCenteredIndex: Int?,
+    val isScrolling: Boolean,
+    val isProgrammaticScroll: Boolean
 )
 
 private enum class TickType {
@@ -434,6 +463,22 @@ private fun findCenteredIndex(layoutInfo: LazyListLayoutInfo): Int? {
     return visibleItems.minByOrNull { item ->
         abs((item.offset + item.size / 2f) - center)
     }?.index
+}
+
+private fun findAlignedCenteredIndex(
+    layoutInfo: LazyListLayoutInfo,
+    alignmentTolerancePx: Float = 1f
+): Int? {
+    val visibleItems = layoutInfo.visibleItemsInfo
+    if (visibleItems.isEmpty()) return null
+
+    val center = (layoutInfo.viewportStartOffset + layoutInfo.viewportEndOffset) / 2f
+    val centeredItem = visibleItems.minByOrNull { item ->
+        abs((item.offset + item.size / 2f) - center)
+    } ?: return null
+
+    val distanceToCenter = abs((centeredItem.offset + centeredItem.size / 2f) - center)
+    return if (distanceToCenter <= alignmentTolerancePx) centeredItem.index else null
 }
 
 private fun Color.orFallback(fallback: Color): Color {
