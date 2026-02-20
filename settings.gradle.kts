@@ -23,4 +23,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "horizontal_picker"
-include(":app")
+include(":picker")
+include(":sample")

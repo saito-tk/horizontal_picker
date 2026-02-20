@@ -1,0 +1,1 @@
+int string horizontal_picker_content_description 0x0

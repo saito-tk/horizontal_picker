@@ -1,0 +1,2 @@
+com.saitotk.horizontalpicker.sample
+string app_name

@@ -1,0 +1,2 @@
+com.saitotk.horizontalpicker
+string horizontal_picker_content_description

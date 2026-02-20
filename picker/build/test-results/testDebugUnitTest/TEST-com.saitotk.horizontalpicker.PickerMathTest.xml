@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.saitotk.horizontalpicker.PickerMathTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-02-20T05:00:35.652Z" hostname="saito-tkMacBook-ProM3Pro.local" time="0.003">
+  <properties/>
+  <testcase name="valueToIndex_clampsLowerAndUpperBounds" classname="com.saitotk.horizontalpicker.PickerMathTest" time="0.002"/>
+  <testcase name="valueToIndex_and_indexToValue_roundTrip" classname="com.saitotk.horizontalpicker.PickerMathTest" time="0.0"/>
+  <testcase name="createPickerModel_createsExpectedTickCount" classname="com.saitotk.horizontalpicker.PickerMathTest" time="0.0"/>
+  <testcase name="snapToStep_returnsNearestCanonicalValue" classname="com.saitotk.horizontalpicker.PickerMathTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
