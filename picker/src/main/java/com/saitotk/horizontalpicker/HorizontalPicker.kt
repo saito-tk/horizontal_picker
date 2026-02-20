@@ -153,21 +153,28 @@ fun HorizontalPicker(
                 hapticFeedback.performHapticFeedback(haptics)
             }
 
-            val emitIndex = when (valueChangeMode) {
-                // Emit only when a tick is actually aligned to center.
-                ValueChangeMode.Continuous -> alignedCentered
-                ValueChangeMode.OnScrollFinished -> {
-                    if (!snapshot.isScrolling) alignedCentered ?: centered else null
-                }
-            }
+            if (snapshot.isProgrammaticScroll) return@collect
 
-            if (
-                !snapshot.isProgrammaticScroll &&
-                emitIndex != null &&
-                emitIndex != emittedIndex
-            ) {
-                emittedIndex = emitIndex
-                onValueChange(model.indexToValue(emitIndex))
+            when (valueChangeMode) {
+                ValueChangeMode.Continuous -> {
+                    // Emit only when a tick is actually aligned with the center indicator.
+                    // Keep 1-step continuity even if some aligned frames are skipped.
+                    if (alignedCentered != null) {
+                        for (index in steppedIndices(emittedIndex, alignedCentered)) {
+                            emittedIndex = index
+                            onValueChange(model.indexToValue(index))
+                        }
+                    }
+                }
+                ValueChangeMode.OnScrollFinished -> {
+                    if (!snapshot.isScrolling) {
+                        val finalIndex = alignedCentered ?: centered
+                        if (finalIndex != emittedIndex) {
+                            emittedIndex = finalIndex
+                            onValueChange(model.indexToValue(finalIndex))
+                        }
+                    }
+                }
             }
         }
     }
@@ -483,4 +490,12 @@ private fun findAlignedCenteredIndex(
 
 private fun Color.orFallback(fallback: Color): Color {
     return if (this == Color.Unspecified) fallback else this
+}
+
+private fun steppedIndices(fromExclusive: Int, toInclusive: Int): IntProgression {
+    if (toInclusive == fromExclusive) {
+        return IntProgression.fromClosedRange(0, -1, 1)
+    }
+    val step = if (toInclusive > fromExclusive) 1 else -1
+    return IntProgression.fromClosedRange(fromExclusive + step, toInclusive, step)
 }
