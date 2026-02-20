@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -205,10 +206,15 @@ fun HorizontalPicker(
                 steps = (model.lastIndex - 1).coerceAtLeast(0)
             )
     ) {
-        val centerPadding = (maxWidth / 2) - (tick.spacing / 2)
+        val density = LocalDensity.current
+        val centerPadding = remember(constraints.maxWidth, tick.spacing, density) {
+            with(density) {
+                ((constraints.maxWidth.toDp() / 2) - (tick.spacing / 2)).coerceAtLeast(0.dp)
+            }
+        }
         val layoutDirection = LocalLayoutDirection.current
         val resolvedPadding = remember(contentPadding, centerPadding, layoutDirection) {
-            resolveContentPadding(contentPadding, centerPadding.coerceAtLeast(0.dp), layoutDirection)
+            resolveContentPadding(contentPadding, centerPadding, layoutDirection)
         }
 
         LazyRow(
