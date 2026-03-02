@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeightIn
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.width
@@ -21,12 +23,12 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.progressSemantics
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
@@ -54,6 +56,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import java.math.BigDecimal
+import java.util.Locale
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -74,7 +78,10 @@ fun HorizontalPicker(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(vertical = 12.dp),
     flingBehavior: FlingBehavior = PickerDefaults.SnapFlingBehavior,
-    indicator: @Composable BoxScope.() -> Unit = { DefaultCenterIndicator() },
+    centerMarker: CenterMarkerStyle = CenterMarkerStyle(),
+    valueBadge: @Composable BoxScope.(valueText: String, color: Color) -> Unit = { valueText, color ->
+        DefaultValueBadge(valueText = valueText, color = color)
+    },
     tick: TickStyle = TickStyle(),
     label: LabelStyle = LabelStyle(),
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
@@ -104,7 +111,6 @@ fun HorizontalPicker(
             findCenteredIndex(listState.layoutInfo) ?: targetIndex
         }
     }
-    val selectedValue = model.indexToValue(selectedIndex)
 
     LaunchedEffect(targetIndex) {
         val currentCentered = findCenteredIndex(listState.layoutInfo)
@@ -189,6 +195,10 @@ fun HorizontalPicker(
                             onValueChange(model.indexToValue(index))
                         }
                     }
+                    if (crossedIndices.isEmpty() && alignedCentered != null && alignedCentered != emittedIndex) {
+                        emittedIndex = alignedCentered
+                        onValueChange(model.indexToValue(alignedCentered))
+                    }
                 }
                 ValueChangeMode.OnScrollFinished -> {
                     if (!snapshot.isScrolling) {
@@ -203,10 +213,17 @@ fun HorizontalPicker(
         }
     }
 
-    val actionLabelFormatter = label.formatter
-    val semanticsLabel = remember(selectedValue, actionLabelFormatter) {
-        actionLabelFormatter(selectedValue)
+    val reportedValue = remember(emittedIndex, model) {
+        model.indexToValue(emittedIndex)
     }
+    val actionLabelFormatter = label.formatter
+    val semanticsLabel = remember(reportedValue, actionLabelFormatter) {
+        actionLabelFormatter(reportedValue)
+    }
+    val selectedValueLabel = remember(reportedValue, step) {
+        formatSelectedValueForBadge(reportedValue, step)
+    }
+    val centerMarkerColor = centerMarker.color.orFallback(MaterialTheme.colorScheme.primary)
 
     BoxWithConstraints(
         modifier = modifier
@@ -224,7 +241,7 @@ fun HorizontalPicker(
                 }
             )
             .progressSemantics(
-                value = selectedValue,
+                value = reportedValue,
                 valueRange = model.start..model.endInclusive,
                 steps = (model.lastIndex - 1).coerceAtLeast(0)
             )
@@ -261,7 +278,14 @@ fun HorizontalPicker(
         }
 
         Box(modifier = Modifier.fillMaxWidth()) {
-            indicator()
+            if (centerMarker.showValueBadge) {
+                valueBadge(selectedValueLabel, centerMarkerColor)
+            }
+            DefaultSelectionStem(
+                color = centerMarkerColor,
+                width = centerMarker.stemWidth,
+                height = centerMarker.stemHeight
+            )
         }
     }
 }
@@ -276,7 +300,10 @@ fun HorizontalPicker(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(vertical = 12.dp),
     flingBehavior: FlingBehavior = PickerDefaults.SnapFlingBehavior,
-    indicator: @Composable BoxScope.() -> Unit = { DefaultCenterIndicator() },
+    centerMarker: CenterMarkerStyle = CenterMarkerStyle(),
+    valueBadge: @Composable BoxScope.(valueText: String, color: Color) -> Unit = { valueText, color ->
+        DefaultValueBadge(valueText = valueText, color = color)
+    },
     tick: TickStyle = TickStyle(),
     label: LabelStyle = LabelStyle(formatter = { it.roundToInt().toString() }),
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
@@ -293,7 +320,8 @@ fun HorizontalPicker(
         modifier = modifier,
         contentPadding = contentPadding,
         flingBehavior = flingBehavior,
-        indicator = indicator,
+        centerMarker = centerMarker,
+        valueBadge = valueBadge,
         tick = tick,
         label = label,
         haptics = haptics,
@@ -302,18 +330,67 @@ fun HorizontalPicker(
     )
 }
 
-/** Default center indicator used by [HorizontalPicker]. */
+@Immutable
+data class CenterMarkerStyle(
+    val color: Color = Color.Unspecified,
+    val stemWidth: Dp = 4.dp,
+    val stemHeight: Dp = 26.dp,
+    val showValueBadge: Boolean = true
+)
+
+/** Default selection stem used by [HorizontalPicker]. */
+@Composable
+fun BoxScope.DefaultSelectionStem(
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary,
+    width: Dp = 4.dp,
+    height: Dp = 26.dp
+) {
+    Box(
+        modifier = modifier
+            .align(Alignment.TopCenter)
+            .width(width)
+            .height(height)
+            .background(color, RoundedCornerShape(percent = 50))
+    )
+}
+
+@Deprecated("Use DefaultSelectionStem")
 @Composable
 fun BoxScope.DefaultCenterIndicator(
     modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.primary
 ) {
-    Box(
+    DefaultSelectionStem(
+        modifier = modifier,
+        color = color
+    )
+}
+
+/** Default value badge used by [HorizontalPicker]. */
+@Composable
+fun BoxScope.DefaultValueBadge(
+    valueText: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Text(
+        text = valueText,
         modifier = modifier
             .align(Alignment.TopCenter)
-            .width(4.dp)
-            .height(26.dp)
-            .background(color, RoundedCornerShape(percent = 50))
+            .offset(y = (-20).dp)
+            .background(
+                color = color,
+                shape = RoundedCornerShape(
+                    topStart = 8.dp,
+                    topEnd = 8.dp,
+                    bottomStart = 8.dp,
+                    bottomEnd = 8.dp
+                )
+            )
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        style = MaterialTheme.typography.labelMedium,
+        color = Color.White
     )
 }
 
@@ -577,4 +654,22 @@ private fun crossedAlignedIndices(from: Float, to: Float, maxIndex: Int): List<I
             (start downTo end).map { it.coerceIn(0, maxIndex) }
         }
     }
+}
+
+private fun formatSelectedValueForBadge(value: Float, step: Float): String {
+    val decimals = stepDecimalPlaces(step)
+    return if (decimals == 0) {
+        value.roundToInt().toString()
+    } else {
+        String.format(Locale.US, "%.${decimals}f", value)
+    }
+}
+
+private fun stepDecimalPlaces(step: Float): Int {
+    val scale = try {
+        BigDecimal.valueOf(step.toDouble()).stripTrailingZeros().scale()
+    } catch (_: NumberFormatException) {
+        0
+    }
+    return scale.coerceAtLeast(0).coerceAtMost(6)
 }
