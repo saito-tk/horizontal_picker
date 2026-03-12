@@ -1,5 +1,6 @@
 package com.saitotk.horizontalpicker
 
+import androidx.compose.ui.geometry.Offset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -37,5 +38,51 @@ class PickerMathTest {
 
         assertEquals(101, model.tickCount)
         assertTrue(model.lastIndex == 100)
+    }
+
+    @Test
+    fun nextEdgeTapAnchorIndex_accumulatesSequentialForwardTaps() {
+        val first = nextEdgeTapAnchorIndex(anchorIndex = 10, delta = 1, maxIndex = 20)
+        val second = nextEdgeTapAnchorIndex(anchorIndex = first, delta = 1, maxIndex = 20)
+
+        assertEquals(11, first)
+        assertEquals(12, second)
+    }
+
+    @Test
+    fun nextEdgeTapAnchorIndex_clampsWithinBounds() {
+        assertEquals(0, nextEdgeTapAnchorIndex(anchorIndex = 0, delta = -1, maxIndex = 20))
+        assertEquals(20, nextEdgeTapAnchorIndex(anchorIndex = 20, delta = 1, maxIndex = 20))
+    }
+
+    @Test
+    fun edgeTapStepDelta_detectsOnlyTopEdgeZones() {
+        assertEquals(
+            -1,
+            edgeTapStepDelta(
+                downPosition = Offset(x = 10f, y = 10f),
+                width = 200f,
+                zoneWidth = 40f,
+                overlayHeight = 30f
+            )
+        )
+        assertEquals(
+            1,
+            edgeTapStepDelta(
+                downPosition = Offset(x = 190f, y = 10f),
+                width = 200f,
+                zoneWidth = 40f,
+                overlayHeight = 30f
+            )
+        )
+        assertEquals(
+            0,
+            edgeTapStepDelta(
+                downPosition = Offset(x = 10f, y = 50f),
+                width = 200f,
+                zoneWidth = 40f,
+                overlayHeight = 30f
+            )
+        )
     }
 }

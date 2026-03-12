@@ -89,7 +89,9 @@ private fun SampleScreen() {
             label = LabelStyle(showEvery = 10),
             centerMarker = CenterMarkerStyle(
                 color = MaterialTheme.colorScheme.error,
-            )
+            ),
+            edgeTapStepEnabled = true,   // 有効化
+            edgeTapZoneFraction = 0.3f   // 左右端1/5
         )
 
         SectionTitle("2) Float picker with labels")

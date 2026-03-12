@@ -2,6 +2,7 @@ package com.saitotk.horizontalpicker
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.FlingBehavior
 import androidx.compose.foundation.gestures.ScrollScope
 import androidx.compose.foundation.layout.Box
@@ -40,9 +41,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -85,9 +89,13 @@ fun HorizontalPicker(
     tick: TickStyle = TickStyle(),
     label: LabelStyle = LabelStyle(),
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
+    edgeTapStepEnabled: Boolean = false,
+    edgeTapZoneFraction: Float = 0.2f,
     enabled: Boolean = true,
     valueChangeMode: ValueChangeMode = ValueChangeMode.AlignedContinuous
 ) {
+    require(edgeTapZoneFraction in 0f..0.5f) { "edgeTapZoneFraction must be in 0f..0.5f" }
+
     val model = remember(valueRange, step) { createPickerModel(valueRange, step) }
     val clampedValue = remember(value, model) { model.snapToStep(value) }
     val targetIndex = remember(clampedValue, model) { model.valueToIndex(clampedValue) }
@@ -104,6 +112,7 @@ fun HorizontalPicker(
 
     var emittedIndex by remember(model) { mutableIntStateOf(targetIndex) }
     var hapticIndex by remember(model) { mutableIntStateOf(targetIndex) }
+    var edgeTapAnchorIndex by remember(model) { mutableIntStateOf(targetIndex) }
     var isProgrammaticScroll by remember(model) { mutableStateOf(false) }
 
     val selectedIndex by remember(listState, targetIndex) {
@@ -119,14 +128,21 @@ fun HorizontalPicker(
             listState.scrollToItem(targetIndex)
             emittedIndex = targetIndex
             hapticIndex = targetIndex
+            edgeTapAnchorIndex = targetIndex
             isProgrammaticScroll = false
             return@LaunchedEffect
         }
 
+        if (listState.isScrollInProgress) {
+            return@LaunchedEffect
+        }
+
+        edgeTapAnchorIndex = targetIndex
         if (!listState.isScrollInProgress && currentCentered != targetIndex) {
             isProgrammaticScroll = true
             try {
                 listState.animateScrollToItem(targetIndex)
+                edgeTapAnchorIndex = targetIndex
             } finally {
                 isProgrammaticScroll = false
             }
@@ -159,6 +175,9 @@ fun HorizontalPicker(
             }
 
             val alignedCentered = snapshot.alignedCenteredIndex
+            if (!snapshot.isScrolling) {
+                edgeTapAnchorIndex = alignedCentered ?: centered
+            }
             if (
                 haptics != null &&
                 enabled &&
@@ -224,6 +243,27 @@ fun HorizontalPicker(
         formatSelectedValueForBadge(reportedValue, step)
     }
     val centerMarkerColor = centerMarker.color.orFallback(MaterialTheme.colorScheme.primary)
+    val density = LocalDensity.current
+    val edgeTapOverlayHeight = maxOf(
+        contentPadding.calculateTopPadding() + centerMarker.stemHeight,
+        centerMarker.stemHeight + if (centerMarker.showValueBadge) 20.dp else 0.dp
+    )
+    val edgeTapOverlayHeightPx = remember(density, edgeTapOverlayHeight) {
+        with(density) { edgeTapOverlayHeight.toPx() }
+    }
+    fun requestEdgeTapStep(delta: Int) {
+        if (!edgeTapStepEnabled || !enabled || delta == 0) return
+
+        val next = nextEdgeTapAnchorIndex(
+            anchorIndex = edgeTapAnchorIndex,
+            delta = delta,
+            maxIndex = model.lastIndex
+        )
+        if (next != edgeTapAnchorIndex) {
+            edgeTapAnchorIndex = next
+            scope.launch { listState.scrollToItem(next) }
+        }
+    }
 
     BoxWithConstraints(
         modifier = modifier
@@ -245,8 +285,38 @@ fun HorizontalPicker(
                 valueRange = model.start..model.endInclusive,
                 steps = (model.lastIndex - 1).coerceAtLeast(0)
             )
+            .pointerInput(
+                edgeTapStepEnabled,
+                enabled,
+                edgeTapZoneFraction,
+                edgeTapOverlayHeightPx,
+                model.lastIndex
+            ) {
+                if (!edgeTapStepEnabled || !enabled || edgeTapZoneFraction <= 0f || edgeTapOverlayHeightPx <= 0f) {
+                    return@pointerInput
+                }
+
+                awaitEachGesture {
+                    val down = awaitFirstPointerDown()
+                    val zoneWidth = size.width.toFloat() * edgeTapZoneFraction
+                    val delta = edgeTapStepDelta(
+                        downPosition = down.position,
+                        width = size.width.toFloat(),
+                        zoneWidth = zoneWidth,
+                        overlayHeight = edgeTapOverlayHeightPx
+                    )
+                    val releasedAsTap = awaitReleaseWithoutDrag(
+                        pointerId = down.id,
+                        startPosition = down.position,
+                        touchSlop = viewConfiguration.touchSlop
+                    )
+
+                    if (releasedAsTap && delta != 0) {
+                        requestEdgeTapStep(delta)
+                    }
+                }
+            }
     ) {
-        val density = LocalDensity.current
         val centerPadding = remember(constraints.maxWidth, tick.spacing, density) {
             with(density) {
                 ((constraints.maxWidth.toDp() / 2) - (tick.spacing / 2)).coerceAtLeast(0.dp)
@@ -307,6 +377,8 @@ fun HorizontalPicker(
     tick: TickStyle = TickStyle(),
     label: LabelStyle = LabelStyle(formatter = { it.roundToInt().toString() }),
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
+    edgeTapStepEnabled: Boolean = false,
+    edgeTapZoneFraction: Float = 0.2f,
     enabled: Boolean = true,
     valueChangeMode: ValueChangeMode = ValueChangeMode.AlignedContinuous
 ) {
@@ -325,6 +397,8 @@ fun HorizontalPicker(
         tick = tick,
         label = label,
         haptics = haptics,
+        edgeTapStepEnabled = edgeTapStepEnabled,
+        edgeTapZoneFraction = edgeTapZoneFraction,
         enabled = enabled,
         valueChangeMode = valueChangeMode
     )
@@ -653,6 +727,53 @@ private fun crossedAlignedIndices(from: Float, to: Float, maxIndex: Int): List<I
         } else {
             (start downTo end).map { it.coerceIn(0, maxIndex) }
         }
+    }
+}
+
+internal fun nextEdgeTapAnchorIndex(anchorIndex: Int, delta: Int, maxIndex: Int): Int {
+    if (maxIndex < 0 || delta == 0) return anchorIndex.coerceAtLeast(0)
+    return (anchorIndex + delta).coerceIn(0, maxIndex)
+}
+
+private suspend fun androidx.compose.ui.input.pointer.AwaitPointerEventScope.awaitFirstPointerDown():
+    androidx.compose.ui.input.pointer.PointerInputChange {
+    while (true) {
+        val event = awaitPointerEvent(PointerEventPass.Final)
+        val down = event.changes.firstOrNull { it.pressed && !it.previousPressed }
+        if (down != null) {
+            return down
+        }
+    }
+}
+
+private suspend fun androidx.compose.ui.input.pointer.AwaitPointerEventScope.awaitReleaseWithoutDrag(
+    pointerId: androidx.compose.ui.input.pointer.PointerId,
+    startPosition: Offset,
+    touchSlop: Float
+): Boolean {
+    while (true) {
+        val event = awaitPointerEvent(PointerEventPass.Final)
+        val change = event.changes.firstOrNull { it.id == pointerId } ?: return false
+        if ((change.position - startPosition).getDistance() > touchSlop) {
+            return false
+        }
+        if (!change.pressed) {
+            return true
+        }
+    }
+}
+
+internal fun edgeTapStepDelta(
+    downPosition: Offset,
+    width: Float,
+    zoneWidth: Float,
+    overlayHeight: Float
+): Int {
+    if (zoneWidth <= 0f || downPosition.y > overlayHeight) return 0
+    return when {
+        downPosition.x <= zoneWidth -> -1
+        downPosition.x >= width - zoneWidth -> 1
+        else -> 0
     }
 }
 
