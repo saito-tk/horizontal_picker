@@ -71,17 +71,17 @@ HorizontalPicker(
     valueRange = 0f..1000f,
     step = 5f,
     tick = TickStyle(
-        spacing = 10.dp,
-        majorEvery = 10,
-        mediumEvery = 5,
-        majorHeight = 16.dp,
-        mediumHeight = 8.dp,
-        minorHeight = 4.dp
+        spacing = 10.dp,      // 各目盛りの横間隔
+        majorEvery = 10,      // 10 tick ごとに大目盛り
+        mediumEvery = 5,      // 5 tick ごとに中目盛り
+        majorHeight = 16.dp,  // 大目盛りの高さ
+        mediumHeight = 8.dp,  // 中目盛りの高さ
+        minorHeight = 4.dp    // 小目盛りの高さ
     ),
     label = LabelStyle(
-        showEvery = 10,
-        width = 64.dp,
-        formatter = { "${it.toInt()} 円" }
+        showEvery = 10,                     // 10 tick ごとにラベル表示
+        width = 64.dp,                      // ラベルの描画幅
+        formatter = { "${it.toInt()} 円" }  // ラベル文字列の変換
     )
 )
 ```
@@ -95,15 +95,15 @@ HorizontalPicker(
     valueRange = 0f..100f,
     step = 1f,
     centerMarker = CenterMarkerStyle(
-        color = MaterialTheme.colorScheme.error,
-        stemWidth = 2.dp,
-        stemHeight = 32.dp,
-        showValueBadge = true
+        color = MaterialTheme.colorScheme.error,  // 中央マーカーの色
+        stemWidth = 2.dp,                         // 中央マーカーの幅
+        stemHeight = 32.dp,                       // 中央マーカーの高さ
+        showValueBadge = true                     // デフォルト値バッジを表示
     ),
     valueBadge = { valueText, color ->
         DefaultValueBadge(
-            valueText = "$valueText kg",
-            color = color
+            valueText = "$valueText kg",  // 表示文字列を差し替え
+            color = color                 // マーカー色をそのまま利用
         )
     }
 )
@@ -117,7 +117,7 @@ HorizontalPicker(
     onValueChange = { count = it },
     range = 0..600,
     step = 1,
-    edgeTapZoneFraction = 0.3f
+    edgeTapZoneFraction = 0.3f  // 左右それぞれ 30% を端タップ領域にする
 )
 ```
 
