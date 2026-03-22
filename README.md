@@ -69,17 +69,10 @@ HorizontalPicker(
 )
 ```
 
-## 値更新モード（重要）
+## 値更新タイミング
 
-`valueChangeMode` で「いつ `onValueChange` するか」を選べます。
-
-- `ValueChangeMode.Continuous`
-  - 連続性重視。高速フリングでも 1 刻みで補間更新。
-- `ValueChangeMode.AlignedContinuous`（デフォルト）
-  - 中央線が目盛り中心を通過したタイミングで連続更新。
-  - haptic と体感を揃えやすい。
-- `ValueChangeMode.OnScrollFinished`
-  - スクロール停止時に確定値だけ更新。
+`onValueChange` は、中央線が目盛り中心を通過したタイミングで連続更新されます。
+高速スクロール時も、通過した tick を補間して更新します。
 
 ## haptic の仕様
 
@@ -113,7 +106,7 @@ HorizontalPicker(
 )
 ```
 
-### 2. インジケータ差し替え
+### 2. センターマーカーの見た目調整
 
 ```kotlin
 HorizontalPicker(
@@ -121,15 +114,12 @@ HorizontalPicker(
     onValueChange = { value = it },
     valueRange = 0f..100f,
     step = 1f,
-    indicator = {
-        Box(
-            Modifier
-                .align(Alignment.TopCenter)
-                .width(2.dp)
-                .height(32.dp)
-                .background(MaterialTheme.colorScheme.error)
-        )
-    }
+    centerMarker = CenterMarkerStyle(
+        color = MaterialTheme.colorScheme.error,
+        stemWidth = 2.dp,
+        stemHeight = 32.dp,
+        showValueBadge = false
+    )
 )
 ```
 
@@ -141,7 +131,6 @@ HorizontalPicker(
     onValueChange = { count = it },
     range = 0..600,
     step = 1,
-    valueChangeMode = ValueChangeMode.OnScrollFinished,
     haptics = null
 )
 ```
@@ -158,12 +147,16 @@ fun HorizontalPicker(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(vertical = 12.dp),
     flingBehavior: FlingBehavior = PickerDefaults.SnapFlingBehavior,
-    indicator: @Composable BoxScope.() -> Unit = { DefaultCenterIndicator() },
+    centerMarker: CenterMarkerStyle = CenterMarkerStyle(),
+    valueBadge: @Composable BoxScope.(valueText: String, color: Color) -> Unit = { valueText, color ->
+        DefaultValueBadge(valueText = valueText, color = color)
+    },
     tick: TickStyle = TickStyle(),
     label: LabelStyle = LabelStyle(),
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
-    enabled: Boolean = true,
-    valueChangeMode: ValueChangeMode = ValueChangeMode.AlignedContinuous
+    edgeTapStepEnabled: Boolean = false,
+    edgeTapZoneFraction: Float = 0.2f,
+    enabled: Boolean = true
 )
 
 @Composable
@@ -175,12 +168,16 @@ fun HorizontalPicker(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(vertical = 12.dp),
     flingBehavior: FlingBehavior = PickerDefaults.SnapFlingBehavior,
-    indicator: @Composable BoxScope.() -> Unit = { DefaultCenterIndicator() },
+    centerMarker: CenterMarkerStyle = CenterMarkerStyle(),
+    valueBadge: @Composable BoxScope.(valueText: String, color: Color) -> Unit = { valueText, color ->
+        DefaultValueBadge(valueText = valueText, color = color)
+    },
     tick: TickStyle = TickStyle(),
     label: LabelStyle = LabelStyle(formatter = { it.roundToInt().toString() }),
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
-    enabled: Boolean = true,
-    valueChangeMode: ValueChangeMode = ValueChangeMode.AlignedContinuous
+    edgeTapStepEnabled: Boolean = false,
+    edgeTapZoneFraction: Float = 0.2f,
+    enabled: Boolean = true
 )
 ```
 
@@ -211,4 +208,3 @@ fun HorizontalPicker(
 - `maven-publish`, `signing`
 - sources/javadocs Jar
 - POM メタデータ（要差し替え）
-

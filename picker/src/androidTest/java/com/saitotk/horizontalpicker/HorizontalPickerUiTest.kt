@@ -60,7 +60,6 @@ class HorizontalPickerUiTest {
                     onValueChange = { value = it },
                     valueRange = 0f..20f,
                     step = 0.5f,
-                    valueChangeMode = ValueChangeMode.OnScrollFinished,
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("picker")

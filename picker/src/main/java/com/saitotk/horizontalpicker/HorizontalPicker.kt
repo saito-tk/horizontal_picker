@@ -91,8 +91,7 @@ fun HorizontalPicker(
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
     edgeTapStepEnabled: Boolean = false,
     edgeTapZoneFraction: Float = 0.2f,
-    enabled: Boolean = true,
-    valueChangeMode: ValueChangeMode = ValueChangeMode.AlignedContinuous
+    enabled: Boolean = true
 ) {
     require(edgeTapZoneFraction in 0f..0.5f) { "edgeTapZoneFraction must be in 0f..0.5f" }
 
@@ -149,7 +148,7 @@ fun HorizontalPicker(
         }
     }
 
-    LaunchedEffect(listState, enabled, valueChangeMode, haptics, isProgrammaticScroll) {
+    LaunchedEffect(listState, enabled, haptics, isProgrammaticScroll) {
         var previousCenteredIndexFloat: Float? = null
 
         snapshotFlow {
@@ -198,36 +197,16 @@ fun HorizontalPicker(
 
             if (snapshot.isProgrammaticScroll) return@collect
 
-            when (valueChangeMode) {
-                ValueChangeMode.Continuous -> {
-                    // Keep 1-step continuity even when frames are skipped during fast fling.
-                    for (index in steppedIndices(emittedIndex, centered)) {
-                        emittedIndex = index
-                        onValueChange(model.indexToValue(index))
-                    }
+            // Emit when center line crosses tick centers even if exact aligned frames are skipped.
+            for (index in crossedIndices) {
+                if (index != emittedIndex) {
+                    emittedIndex = index
+                    onValueChange(model.indexToValue(index))
                 }
-                ValueChangeMode.AlignedContinuous -> {
-                    // Emit when center line crosses tick centers even if exact aligned frames are skipped.
-                    for (index in crossedIndices) {
-                        if (index != emittedIndex) {
-                            emittedIndex = index
-                            onValueChange(model.indexToValue(index))
-                        }
-                    }
-                    if (crossedIndices.isEmpty() && alignedCentered != null && alignedCentered != emittedIndex) {
-                        emittedIndex = alignedCentered
-                        onValueChange(model.indexToValue(alignedCentered))
-                    }
-                }
-                ValueChangeMode.OnScrollFinished -> {
-                    if (!snapshot.isScrolling) {
-                        val finalIndex = alignedCentered ?: centered
-                        if (finalIndex != emittedIndex) {
-                            emittedIndex = finalIndex
-                            onValueChange(model.indexToValue(finalIndex))
-                        }
-                    }
-                }
+            }
+            if (crossedIndices.isEmpty() && alignedCentered != null && alignedCentered != emittedIndex) {
+                emittedIndex = alignedCentered
+                onValueChange(model.indexToValue(alignedCentered))
             }
         }
     }
@@ -379,8 +358,7 @@ fun HorizontalPicker(
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
     edgeTapStepEnabled: Boolean = false,
     edgeTapZoneFraction: Float = 0.2f,
-    enabled: Boolean = true,
-    valueChangeMode: ValueChangeMode = ValueChangeMode.AlignedContinuous
+    enabled: Boolean = true
 ) {
     require(step > 0) { "step must be > 0" }
 
@@ -399,8 +377,7 @@ fun HorizontalPicker(
         haptics = haptics,
         edgeTapStepEnabled = edgeTapStepEnabled,
         edgeTapZoneFraction = edgeTapZoneFraction,
-        enabled = enabled,
-        valueChangeMode = valueChangeMode
+        enabled = enabled
     )
 }
 
@@ -466,23 +443,6 @@ fun BoxScope.DefaultValueBadge(
         style = MaterialTheme.typography.labelMedium,
         color = Color.White
     )
-}
-
-/** Controls how and when [onValueChange] is called while scrolling. */
-enum class ValueChangeMode {
-    /**
-     * Emits continuously while scrolling based on nearest centered tick.
-     * Best for smooth 1-step continuity during fast flings.
-     */
-    Continuous,
-
-    /**
-     * Emits only when a tick is actually aligned with the center indicator.
-     * Can feel less continuous at high velocity.
-     */
-    AlignedContinuous,
-
-    OnScrollFinished
 }
 
 /** Visual style for each tick mark. */
@@ -698,14 +658,6 @@ private fun findAlignedCenteredIndex(
 
 private fun Color.orFallback(fallback: Color): Color {
     return if (this == Color.Unspecified) fallback else this
-}
-
-private fun steppedIndices(fromExclusive: Int, toInclusive: Int): IntProgression {
-    if (toInclusive == fromExclusive) {
-        return IntProgression.fromClosedRange(0, -1, 1)
-    }
-    val step = if (toInclusive > fromExclusive) 1 else -1
-    return IntProgression.fromClosedRange(fromExclusive + step, toInclusive, step)
 }
 
 private fun crossedAlignedIndices(from: Float, to: Float, maxIndex: Int): List<Int> {
