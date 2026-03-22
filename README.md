@@ -31,10 +31,10 @@ dependencies {
 var temperature by rememberSaveable { mutableFloatStateOf(36.5f) }
 
 HorizontalPicker(
-    value = temperature,
-    onValueChange = { temperature = it },
-    valueRange = 35f..42f,
-    step = 0.1f
+    value = temperature,                 // 現在選択中の値
+    onValueChange = { temperature = it },  // 値変更時の反映先
+    valueRange = 35f..42f,               // 選択可能な範囲
+    step = 0.1f                          // 1 tick あたりの増減幅
 )
 ```
 
@@ -44,10 +44,10 @@ HorizontalPicker(
 var age by rememberSaveable { mutableIntStateOf(30) }
 
 HorizontalPicker(
-    value = age,
-    onValueChange = { age = it },
-    range = 0..120,
-    step = 1
+    value = age,                 // 現在選択中の値
+    onValueChange = { age = it },  // 値変更時の反映先
+    range = 0..120,              // 選択可能な範囲
+    step = 1                     // 1 tick あたりの増減幅
 )
 ```
 
@@ -61,6 +61,8 @@ HorizontalPicker(
 - デフォルトでは `rememberSnapFlingBehavior` を使って中央にスナップします。
 
 ## カスタマイズ
+
+以下の例では、`value` / `onValueChange` / `valueRange` または `range` / `step` の共通説明は省略し、カスタマイズ対象の引数にだけコメントを付けています。
 
 ### 目盛りとラベル
 
