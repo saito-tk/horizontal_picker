@@ -90,8 +90,7 @@ private fun SampleScreen() {
             centerMarker = CenterMarkerStyle(
                 color = MaterialTheme.colorScheme.error,
             ),
-            edgeTapStepEnabled = true,   // 有効化
-            edgeTapZoneFraction = 0.3f   // 左右端1/5
+            edgeTapZoneFraction = 0.3f   // 上部の左右 30% を端タップ領域にする
         )
 
         SectionTitle("2) Float picker with labels")

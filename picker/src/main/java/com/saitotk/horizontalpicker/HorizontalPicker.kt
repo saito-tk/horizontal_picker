@@ -89,11 +89,14 @@ fun HorizontalPicker(
     tick: TickStyle = TickStyle(),
     label: LabelStyle = LabelStyle(),
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
-    edgeTapStepEnabled: Boolean = false,
-    edgeTapZoneFraction: Float = 0.2f,
+    edgeTapZoneFraction: Float = 0f,
     enabled: Boolean = true
 ) {
-    require(edgeTapZoneFraction in 0f..0.5f) { "edgeTapZoneFraction must be in 0f..0.5f" }
+    require(edgeTapZoneFraction == 0f || edgeTapZoneFraction in 0.1f..0.5f) {
+        "edgeTapZoneFraction must be 0f (off) or in 0.1f..0.5f"
+    }
+
+    val edgeTapStepEnabled = edgeTapZoneFraction >= 0.1f
 
     val model = remember(valueRange, step) { createPickerModel(valueRange, step) }
     val clampedValue = remember(value, model) { model.snapToStep(value) }
@@ -356,8 +359,7 @@ fun HorizontalPicker(
     tick: TickStyle = TickStyle(),
     label: LabelStyle = LabelStyle(formatter = { it.roundToInt().toString() }),
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
-    edgeTapStepEnabled: Boolean = false,
-    edgeTapZoneFraction: Float = 0.2f,
+    edgeTapZoneFraction: Float = 0f,
     enabled: Boolean = true
 ) {
     require(step > 0) { "step must be > 0" }
@@ -375,7 +377,6 @@ fun HorizontalPicker(
         tick = tick,
         label = label,
         haptics = haptics,
-        edgeTapStepEnabled = edgeTapStepEnabled,
         edgeTapZoneFraction = edgeTapZoneFraction,
         enabled = enabled
     )

@@ -117,12 +117,17 @@ HorizontalPicker(
     onValueChange = { count = it },
     range = 0..600,
     step = 1,
-    edgeTapStepEnabled = true,
     edgeTapZoneFraction = 0.3f
 )
 ```
 
-`edgeTapStepEnabled` を有効にすると、マーカー上部の左右端タップで 1 step ずつ移動できます。
+`edgeTapZoneFraction = 0f` のときは無効です。`0.1f..0.5f` を指定すると、マーカー上部の左右端タップで 1 step ずつ移動できます。
+
+`edgeTapZoneFraction` は、コンポーネント全体の幅に対して左右それぞれ何割を端タップ領域にするかを表します。
+
+- `0.1f` なら左 10% と右 10%
+- `0.3f` なら左 30% と右 30%
+- 判定されるのはマーカー上部のオーバーレイ領域内だけです
 
 ## 主な引数
 
@@ -138,6 +143,8 @@ HorizontalPicker(
   `null` を渡すと haptic を無効化できます。
 - `flingBehavior`
   デフォルトはスナップ挙動です。独自の `FlingBehavior` を渡せます。
+- `edgeTapZoneFraction`
+  `0f` で無効です。`0.1f..0.5f` を指定すると、上部の左右端タップで 1 step 移動できます。
 - `enabled`
   `false` でスクロールと端タップを無効化します。
 
@@ -148,7 +155,7 @@ HorizontalPicker(
 - 選択可能な値は `start + n * step` です。
 - `valueRange` と `step` が割り切れない場合、上限ぴったりの値は選択できないことがあります。
   例: `0f..10f` と `step = 3f` の選択値は `0, 3, 6, 9` です。
-- `edgeTapZoneFraction` は `0f..0.5f` の範囲で指定します。
+- `edgeTapZoneFraction` は `0f` または `0.1f..0.5f` で指定します。
 - デフォルトの値バッジ表示は `step` に応じて小数桁数を自動決定し、最大 6 桁まで表示します。
 
 ## 公開 API
@@ -170,8 +177,7 @@ fun HorizontalPicker(
     tick: TickStyle = TickStyle(),
     label: LabelStyle = LabelStyle(),
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
-    edgeTapStepEnabled: Boolean = false,
-    edgeTapZoneFraction: Float = 0.2f,
+    edgeTapZoneFraction: Float = 0f,
     enabled: Boolean = true
 )
 
@@ -191,8 +197,7 @@ fun HorizontalPicker(
     tick: TickStyle = TickStyle(),
     label: LabelStyle = LabelStyle(formatter = { it.roundToInt().toString() }),
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
-    edgeTapStepEnabled: Boolean = false,
-    edgeTapZoneFraction: Float = 0.2f,
+    edgeTapZoneFraction: Float = 0f,
     enabled: Boolean = true
 )
 ```
