@@ -1,41 +1,21 @@
 # Horizontal Picker for Jetpack Compose
 
-Jetpack Compose 向けの **横スクロール式 Picker ライブラリ**です。  
-中央の固定インジケータに目盛りを合わせて値を選択します。
+Jetpack Compose 向けの横スクロール式 Picker ライブラリです。中央の固定マーカーに目盛りを合わせて、`Float` または `Int` の値を選択できます。
 
-- Module: `:picker`（ライブラリ）
-- Sample: `:sample`（動作確認アプリ）
-- minSdk: `21+`
+- Compose 専用
+- minSdk `21+`
+- `Float` / `Int` API を提供
+- スナップ、haptic、アクセシビリティ、RTL に対応
 
-## できること
+## デモ
 
-- `LazyRow` ベースの高パフォーマンスな横 picker
-- 中央インジケータ固定 + スナップ挙動
-- `Float` / `Int` API
-- 小 / 中 / 大目盛り（`mediumEvery`, `majorEvery`）
-- ラベル表示・フォーマット
-- インジケータ差し替え
-- haptic フィードバック
-- アクセシビリティ対応（stateDescription / 増減アクション）
-- RTL 対応
+サンプルアプリでの操作感です。
 
-## できないこと（意図的な非対応）
+![Horizontal Picker demo](docs/assets/horizontal_picker_480p.gif)
 
-- 無限ホイール
-- 非線形スケール（対数など）
-- View システム版（Compose 専用）
+## 導入
 
-## インストール
-
-Maven Central に公開する場合の想定座標（雛形）:
-
-```kotlin
-dependencies {
-    implementation("io.github.your-github-id:horizontal-picker:0.1.0")
-}
-```
-
-ローカルで試す場合は `:picker` を参照:
+このリポジトリではライブラリ本体は `:picker` モジュールです。
 
 ```kotlin
 dependencies {
@@ -43,20 +23,22 @@ dependencies {
 }
 ```
 
-## 最小使用例（Float）
+## 基本の使い方
+
+### Float
 
 ```kotlin
-var value by rememberSaveable { mutableFloatStateOf(50f) }
+var temperature by rememberSaveable { mutableFloatStateOf(36.5f) }
 
 HorizontalPicker(
-    value = value,
-    onValueChange = { value = it },
-    valueRange = 0f..100f,
-    step = 1f
+    value = temperature,
+    onValueChange = { temperature = it },
+    valueRange = 35f..42f,
+    step = 0.1f
 )
 ```
 
-## 最小使用例（Int）
+### Int
 
 ```kotlin
 var age by rememberSaveable { mutableIntStateOf(30) }
@@ -69,20 +51,18 @@ HorizontalPicker(
 )
 ```
 
-## 値更新タイミング
+## 挙動
 
-`onValueChange` は、中央線が目盛り中心を通過したタイミングで連続更新されます。
-高速スクロール時も、通過した tick を補間して更新します。
+- 1 tick = 1 step の線形 picker です。
+- `value` はレンジ内に clamp され、最も近い step に snap されます。
+- `onValueChange` は、中央線が目盛り中心を通過したタイミングで呼ばれます。
+- 高速フリング時も、通過した step を補間して値更新と haptic を行います。
+- 外部 state の反映で発生するプログラム的なスクロール中は haptic を抑制します。
+- デフォルトでは `rememberSnapFlingBehavior` を使って中央にスナップします。
 
-## haptic の仕様
+## カスタマイズ
 
-- 目盛り中心が中央線を通過したタイミングで発火。
-- 高速スクロール時も通過した tick を補間して発火。
-- プログラム的なスクロール同期中（外部 state 反映）は発火抑制。
-
-## カスタマイズ例
-
-### 1. 目盛りとラベル
+### 目盛りとラベル
 
 ```kotlin
 HorizontalPicker(
@@ -106,24 +86,30 @@ HorizontalPicker(
 )
 ```
 
-### 2. センターマーカーの見た目調整
+### センターマーカーと値バッジ
 
 ```kotlin
 HorizontalPicker(
-    value = value,
-    onValueChange = { value = it },
+    value = amount,
+    onValueChange = { amount = it },
     valueRange = 0f..100f,
     step = 1f,
     centerMarker = CenterMarkerStyle(
         color = MaterialTheme.colorScheme.error,
         stemWidth = 2.dp,
         stemHeight = 32.dp,
-        showValueBadge = false
-    )
+        showValueBadge = true
+    ),
+    valueBadge = { valueText, color ->
+        DefaultValueBadge(
+            valueText = "$valueText kg",
+            color = color
+        )
+    }
 )
 ```
 
-### 3. Integer picker を軽量運用
+### 端タップで 1 step 移動
 
 ```kotlin
 HorizontalPicker(
@@ -131,11 +117,41 @@ HorizontalPicker(
     onValueChange = { count = it },
     range = 0..600,
     step = 1,
-    haptics = null
+    edgeTapStepEnabled = true,
+    edgeTapZoneFraction = 0.3f
 )
 ```
 
-## API
+`edgeTapStepEnabled` を有効にすると、マーカー上部の左右端タップで 1 step ずつ移動できます。
+
+## 主な引数
+
+- `tick: TickStyle`
+  目盛りの間隔、高さ、太さ、色、`mediumEvery`、`majorEvery` を指定します。
+- `label: LabelStyle`
+  ラベルの有無、表示間隔、幅、文字色、フォーマッタを指定します。
+- `centerMarker: CenterMarkerStyle`
+  中央マーカーの色、幅、高さ、値バッジ表示を指定します。
+- `valueBadge`
+  選択中の値バッジを差し替えます。引数は整形済み文字列とマーカー色です。
+- `haptics`
+  `null` を渡すと haptic を無効化できます。
+- `flingBehavior`
+  デフォルトはスナップ挙動です。独自の `FlingBehavior` を渡せます。
+- `enabled`
+  `false` でスクロールと端タップを無効化します。
+
+## 制約と注意点
+
+- `Float` API の `step` は `> 0f`、`Int` API の `step` は `> 0` が必要です。
+- `valueRange.start <= valueRange.endInclusive` である必要があります。
+- 選択可能な値は `start + n * step` です。
+- `valueRange` と `step` が割り切れない場合、上限ぴったりの値は選択できないことがあります。
+  例: `0f..10f` と `step = 3f` の選択値は `0, 3, 6, 9` です。
+- `edgeTapZoneFraction` は `0f..0.5f` の範囲で指定します。
+- デフォルトの値バッジ表示は `step` に応じて小数桁数を自動決定し、最大 6 桁まで表示します。
+
+## 公開 API
 
 ```kotlin
 @Composable
@@ -180,31 +196,3 @@ fun HorizontalPicker(
     enabled: Boolean = true
 )
 ```
-
-## 設計メモ
-
-- 1 tick = 1 step の線形モデル
-- `value <-> index` 変換をライブラリ内で完結
-- 左右パディングを自動補正し、端値も中央に合わせられる
-- `LazyRow` の virtualization を使うため大量 tick でも破綻しにくい
-
-## テスト
-
-- Unit test: `:picker:test`
-  - 変換ロジック（`valueToIndex`, `indexToValue`, `snapToStep`）
-- UI test: `:picker:connectedAndroidTest`
-  - 値変化 / スナップの最低限確認
-
-## サンプル起動
-
-```bash
-./gradlew :sample:installDebug
-```
-
-## 公開準備（雛形）
-
-`picker/build.gradle.kts` に以下を用意済み:
-
-- `maven-publish`, `signing`
-- sources/javadocs Jar
-- POM メタデータ（要差し替え）
