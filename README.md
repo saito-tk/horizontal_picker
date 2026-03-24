@@ -59,7 +59,7 @@ HorizontalPicker(
 - `onValueChange` は、中央線が目盛り中心を通過したタイミングで呼ばれます。
 - 高速フリング時も、通過した step を補間して値更新と haptic を行います。
 - 外部 state の反映で発生するプログラム的なスクロール中は haptic を抑制します。
-- デフォルトでは `rememberSnapFlingBehavior` を使って中央にスナップします。
+- デフォルトでは速度に応じた移動量を持つスナップ付き fling を使います。
 
 ## カスタマイズ
 
