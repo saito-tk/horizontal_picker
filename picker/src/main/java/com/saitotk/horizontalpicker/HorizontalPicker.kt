@@ -147,11 +147,30 @@ fun HorizontalPicker(
         }
     }
 
+    fun commitSettledIndex(index: Int, emitValueChange: Boolean, triggerHaptic: Boolean) {
+        val clampedIndex = index.coerceIn(0, model.lastIndex)
+        currentIndexFloat = clampedIndex.toFloat()
+        edgeTapAnchorIndex = clampedIndex
+
+        if (triggerHaptic && haptics != null && enabled && clampedIndex != hapticIndex) {
+            hapticIndex = clampedIndex
+            hapticFeedback.performHapticFeedback(haptics)
+        }
+
+        if (emitValueChange && clampedIndex != emittedIndex) {
+            emittedIndex = clampedIndex
+            onValueChange(model.indexToValue(clampedIndex))
+        }
+    }
+
     suspend fun animateToIndex(index: Int, markProgrammatic: Boolean) {
         val clampedTarget = index.coerceIn(0, model.lastIndex).toFloat()
         if (abs(currentIndexFloat - clampedTarget) < 0.0001f) {
-            currentIndexFloat = clampedTarget
-            edgeTapAnchorIndex = clampedTarget.roundToInt()
+            commitSettledIndex(
+                index = clampedTarget.roundToInt(),
+                emitValueChange = !markProgrammatic,
+                triggerHaptic = !markProgrammatic
+            )
             return
         }
 
@@ -179,11 +198,15 @@ fun HorizontalPicker(
     }
 
     suspend fun stopAndSnapToIndex(index: Int) {
-        val clampedTarget = index.coerceIn(0, model.lastIndex).toFloat()
+        val clampedTarget = index.coerceIn(0, model.lastIndex)
         scrollableState.scroll(MutatePriority.PreventUserInput) {
-            currentIndexFloat = clampedTarget
-            edgeTapAnchorIndex = clampedTarget.roundToInt()
+            currentIndexFloat = clampedTarget.toFloat()
         }
+        commitSettledIndex(
+            index = clampedTarget,
+            emitValueChange = true,
+            triggerHaptic = true
+        )
     }
 
     LaunchedEffect(model) {
@@ -289,12 +312,18 @@ fun HorizontalPicker(
     fun requestEdgeTapStep(delta: Int) {
         if (!edgeTapStepEnabled || !enabled || delta == 0) return
 
+        val anchorIndex = effectiveEdgeTapAnchorIndex(
+            settledAnchorIndex = edgeTapAnchorIndex,
+            currentIndexFloat = currentIndexFloat,
+            isScrolling = scrollableState.isScrollInProgress,
+            maxIndex = model.lastIndex
+        )
         val next = nextEdgeTapAnchorIndex(
-            anchorIndex = edgeTapAnchorIndex,
+            anchorIndex = anchorIndex,
             delta = delta,
             maxIndex = model.lastIndex
         )
-        if (next != edgeTapAnchorIndex) {
+        if (next != anchorIndex) {
             edgeTapAnchorIndex = next
             scope.launch { stopAndSnapToIndex(next) }
         }
@@ -760,6 +789,20 @@ private inline fun forEachCrossedAlignedIndex(
 internal fun nextEdgeTapAnchorIndex(anchorIndex: Int, delta: Int, maxIndex: Int): Int {
     if (maxIndex < 0 || delta == 0) return anchorIndex.coerceAtLeast(0)
     return (anchorIndex + delta).coerceIn(0, maxIndex)
+}
+
+internal fun effectiveEdgeTapAnchorIndex(
+    settledAnchorIndex: Int,
+    currentIndexFloat: Float,
+    isScrolling: Boolean,
+    maxIndex: Int
+): Int {
+    if (maxIndex < 0) return 0
+    return if (isScrolling) {
+        currentIndexFloat.roundToInt().coerceIn(0, maxIndex)
+    } else {
+        settledAnchorIndex.coerceIn(0, maxIndex)
+    }
 }
 
 private suspend fun androidx.compose.ui.input.pointer.AwaitPointerEventScope.awaitFirstPointerDown():

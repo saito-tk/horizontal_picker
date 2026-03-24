@@ -56,6 +56,30 @@ class PickerMathTest {
     }
 
     @Test
+    fun effectiveEdgeTapAnchorIndex_usesCurrentPositionWhileScrolling() {
+        val anchor = effectiveEdgeTapAnchorIndex(
+            settledAnchorIndex = 10,
+            currentIndexFloat = 103.6f,
+            isScrolling = true,
+            maxIndex = 200
+        )
+
+        assertEquals(104, anchor)
+    }
+
+    @Test
+    fun effectiveEdgeTapAnchorIndex_usesSettledAnchorWhenIdle() {
+        val anchor = effectiveEdgeTapAnchorIndex(
+            settledAnchorIndex = 10,
+            currentIndexFloat = 103.6f,
+            isScrolling = false,
+            maxIndex = 200
+        )
+
+        assertEquals(10, anchor)
+    }
+
+    @Test
     fun edgeTapStepDelta_detectsOnlyTopEdgeZones() {
         assertEquals(
             -1,
