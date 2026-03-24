@@ -6,6 +6,7 @@ Jetpack Compose 向けの横スクロール式 Picker ライブラリです。�
 - minSdk `21+`
 - `Float` / `Int` API を提供
 - スナップ、haptic、アクセシビリティ、RTL に対応
+- 広いレンジでも扱いやすい軽量な描画実装
 
 ## デモ
 
@@ -144,7 +145,7 @@ HorizontalPicker(
 - `haptics`
   `null` を渡すと haptic を無効化できます。
 - `flingBehavior`
-  デフォルトはスナップ挙動です。独自の `FlingBehavior` を渡せます。
+  デフォルトは速度に応じた移動量を持つスナップ挙動です。独自の `FlingBehavior` を渡せます。
 - `edgeTapZoneFraction`
   `0f` で無効です。`0.1f..0.5f` を指定すると、上部の左右端タップで 1 step 移動できます。
 - `enabled`
