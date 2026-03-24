@@ -1,17 +1,20 @@
 package com.saitotk.horizontalpicker
 
-import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.FlingBehavior
 import androidx.compose.foundation.gestures.ScrollScope
+import androidx.compose.foundation.gestures.rememberScrollableState
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.calculateEndPadding
-import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -19,13 +22,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeightIn
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyListLayoutInfo
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.progressSemantics
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,14 +32,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -55,16 +56,23 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import java.math.BigDecimal
 import java.util.Locale
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.floor
+import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
@@ -101,66 +109,111 @@ fun HorizontalPicker(
     val model = remember(valueRange, step) { createPickerModel(valueRange, step) }
     val clampedValue = remember(value, model) { model.snapToStep(value) }
     val targetIndex = remember(clampedValue, model) { model.valueToIndex(clampedValue) }
-
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = targetIndex)
-    val resolvedFlingBehavior = if (flingBehavior === PickerDefaults.SnapFlingBehavior) {
-        rememberSnapFlingBehavior(lazyListState = listState)
-    } else {
-        flingBehavior
+    val density = LocalDensity.current
+    val stepPx = remember(density, tick.spacing) {
+        with(density) { tick.spacing.toPx().coerceAtLeast(1f) }
     }
+    val maxIndexFloat = remember(model) { model.lastIndex.toFloat() }
 
     val hapticFeedback = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
 
+    var currentIndexFloat by remember(model) { mutableFloatStateOf(targetIndex.toFloat()) }
     var emittedIndex by remember(model) { mutableIntStateOf(targetIndex) }
     var hapticIndex by remember(model) { mutableIntStateOf(targetIndex) }
     var edgeTapAnchorIndex by remember(model) { mutableIntStateOf(targetIndex) }
     var isProgrammaticScroll by remember(model) { mutableStateOf(false) }
 
-    val selectedIndex by remember(listState, targetIndex) {
+    val scrollableState = rememberScrollableState { delta ->
+        val nextIndex = (currentIndexFloat - delta / stepPx).coerceIn(0f, maxIndexFloat)
+        val consumed = (currentIndexFloat - nextIndex) * stepPx
+        currentIndexFloat = nextIndex
+        consumed
+    }
+    val resolvedFlingBehavior = if (flingBehavior === PickerDefaults.SnapFlingBehavior) {
+        rememberPickerSnapFlingBehavior(
+            scrollableState = scrollableState,
+            currentIndexFloat = { currentIndexFloat },
+            stepPx = { stepPx },
+            maxIndex = { model.lastIndex }
+        )
+    } else {
+        flingBehavior
+    }
+
+    val selectedIndex by remember(currentIndexFloat, model) {
         derivedStateOf {
-            findCenteredIndex(listState.layoutInfo) ?: targetIndex
+            currentIndexFloat.roundToInt().coerceIn(0, model.lastIndex)
         }
+    }
+
+    suspend fun animateToIndex(index: Int, markProgrammatic: Boolean) {
+        val clampedTarget = index.coerceIn(0, model.lastIndex).toFloat()
+        if (abs(currentIndexFloat - clampedTarget) < 0.0001f) {
+            currentIndexFloat = clampedTarget
+            edgeTapAnchorIndex = clampedTarget.roundToInt()
+            return
+        }
+
+        if (markProgrammatic) isProgrammaticScroll = true
+        try {
+            scrollableState.scroll(MutatePriority.PreventUserInput) {
+                var previousValue = 0f
+                animate(
+                    initialValue = 0f,
+                    targetValue = (currentIndexFloat - clampedTarget) * stepPx,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                ) { value, _ ->
+                    val delta = value - previousValue
+                    previousValue = value
+                    scrollBy(delta)
+                }
+            }
+            edgeTapAnchorIndex = clampedTarget.roundToInt()
+        } finally {
+            if (markProgrammatic) isProgrammaticScroll = false
+        }
+    }
+
+    suspend fun stopAndSnapToIndex(index: Int) {
+        val clampedTarget = index.coerceIn(0, model.lastIndex).toFloat()
+        scrollableState.scroll(MutatePriority.PreventUserInput) {
+            currentIndexFloat = clampedTarget
+            edgeTapAnchorIndex = clampedTarget.roundToInt()
+        }
+    }
+
+    LaunchedEffect(model) {
+        currentIndexFloat = targetIndex.toFloat()
+        emittedIndex = targetIndex
+        hapticIndex = targetIndex
+        edgeTapAnchorIndex = targetIndex
+        isProgrammaticScroll = false
     }
 
     LaunchedEffect(targetIndex) {
-        val currentCentered = findCenteredIndex(listState.layoutInfo)
-        if (currentCentered == null) {
-            isProgrammaticScroll = true
-            listState.scrollToItem(targetIndex)
-            emittedIndex = targetIndex
-            hapticIndex = targetIndex
-            edgeTapAnchorIndex = targetIndex
-            isProgrammaticScroll = false
-            return@LaunchedEffect
-        }
-
-        if (listState.isScrollInProgress) {
-            return@LaunchedEffect
-        }
-
-        edgeTapAnchorIndex = targetIndex
-        if (!listState.isScrollInProgress && currentCentered != targetIndex) {
-            isProgrammaticScroll = true
-            try {
-                listState.animateScrollToItem(targetIndex)
-                edgeTapAnchorIndex = targetIndex
-            } finally {
-                isProgrammaticScroll = false
-            }
-        }
+        if (scrollableState.isScrollInProgress) return@LaunchedEffect
+        if (targetIndex == emittedIndex) return@LaunchedEffect
+        if (abs(currentIndexFloat - targetIndex.toFloat()) < 0.0001f) return@LaunchedEffect
+        animateToIndex(targetIndex, markProgrammatic = true)
     }
 
-    LaunchedEffect(listState, enabled, haptics, isProgrammaticScroll) {
+    LaunchedEffect(scrollableState, enabled, haptics, isProgrammaticScroll, stepPx) {
         var previousCenteredIndexFloat: Float? = null
 
         snapshotFlow {
-            val layoutInfo = listState.layoutInfo
             PickerSnapshot(
-                centeredIndex = findCenteredIndex(layoutInfo),
-                centeredIndexFloat = findCenteredIndexFloat(layoutInfo),
-                alignedCenteredIndex = findAlignedCenteredIndex(layoutInfo),
-                isScrolling = listState.isScrollInProgress,
+                centeredIndex = currentIndexFloat.roundToInt().coerceIn(0, model.lastIndex),
+                centeredIndexFloat = currentIndexFloat,
+                alignedCenteredIndex = alignedCenteredIndex(
+                    currentIndexFloat = currentIndexFloat,
+                    maxIndex = model.lastIndex,
+                    stepPx = stepPx
+                ),
+                isScrolling = scrollableState.isScrollInProgress,
                 isProgrammaticScroll = isProgrammaticScroll
             )
         }
@@ -170,11 +223,7 @@ fun HorizontalPicker(
             val centeredFloat = snapshot.centeredIndexFloat
             val previousFloat = previousCenteredIndexFloat
             previousCenteredIndexFloat = centeredFloat
-            val crossedIndices = if (previousFloat != null && centeredFloat != null) {
-                crossedAlignedIndices(previousFloat, centeredFloat, model.lastIndex)
-            } else {
-                emptyList()
-            }
+            var crossedAnyIndex = false
 
             val alignedCentered = snapshot.alignedCenteredIndex
             if (!snapshot.isScrolling) {
@@ -185,14 +234,16 @@ fun HorizontalPicker(
                 enabled &&
                 !snapshot.isProgrammaticScroll
             ) {
-                if (crossedIndices.isNotEmpty()) {
-                    for (index in crossedIndices) {
+                if (previousFloat != null && centeredFloat != null) {
+                    forEachCrossedAlignedIndex(previousFloat, centeredFloat, model.lastIndex) { index ->
+                        crossedAnyIndex = true
                         if (index != hapticIndex) {
                             hapticIndex = index
                             hapticFeedback.performHapticFeedback(haptics)
                         }
                     }
-                } else if (alignedCentered != null && alignedCentered != hapticIndex) {
+                }
+                if (!crossedAnyIndex && alignedCentered != null && alignedCentered != hapticIndex) {
                     hapticIndex = alignedCentered
                     hapticFeedback.performHapticFeedback(haptics)
                 }
@@ -201,13 +252,16 @@ fun HorizontalPicker(
             if (snapshot.isProgrammaticScroll) return@collect
 
             // Emit when center line crosses tick centers even if exact aligned frames are skipped.
-            for (index in crossedIndices) {
-                if (index != emittedIndex) {
-                    emittedIndex = index
-                    onValueChange(model.indexToValue(index))
+            if (previousFloat != null && centeredFloat != null) {
+                forEachCrossedAlignedIndex(previousFloat, centeredFloat, model.lastIndex) { index ->
+                    crossedAnyIndex = true
+                    if (index != emittedIndex) {
+                        emittedIndex = index
+                        onValueChange(model.indexToValue(index))
+                    }
                 }
             }
-            if (crossedIndices.isEmpty() && alignedCentered != null && alignedCentered != emittedIndex) {
+            if (!crossedAnyIndex && alignedCentered != null && alignedCentered != emittedIndex) {
                 emittedIndex = alignedCentered
                 onValueChange(model.indexToValue(alignedCentered))
             }
@@ -225,7 +279,6 @@ fun HorizontalPicker(
         formatSelectedValueForBadge(reportedValue, step)
     }
     val centerMarkerColor = centerMarker.color.orFallback(MaterialTheme.colorScheme.primary)
-    val density = LocalDensity.current
     val edgeTapOverlayHeight = maxOf(
         contentPadding.calculateTopPadding() + centerMarker.stemHeight,
         centerMarker.stemHeight + if (centerMarker.showValueBadge) 20.dp else 0.dp
@@ -243,11 +296,11 @@ fun HorizontalPicker(
         )
         if (next != edgeTapAnchorIndex) {
             edgeTapAnchorIndex = next
-            scope.launch { listState.scrollToItem(next) }
+            scope.launch { stopAndSnapToIndex(next) }
         }
     }
 
-    BoxWithConstraints(
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .pickerSemantics(
@@ -256,10 +309,10 @@ fun HorizontalPicker(
                 currentIndex = selectedIndex,
                 maxIndex = model.lastIndex,
                 onIncrease = {
-                    scope.launch { listState.animateScrollToItem((selectedIndex + 1).coerceAtMost(model.lastIndex)) }
+                    scope.launch { stopAndSnapToIndex((selectedIndex + 1).coerceAtMost(model.lastIndex)) }
                 },
                 onDecrease = {
-                    scope.launch { listState.animateScrollToItem((selectedIndex - 1).coerceAtLeast(0)) }
+                    scope.launch { stopAndSnapToIndex((selectedIndex - 1).coerceAtLeast(0)) }
                 }
             )
             .progressSemantics(
@@ -298,36 +351,23 @@ fun HorizontalPicker(
                     }
                 }
             }
+            .scrollable(
+                state = scrollableState,
+                orientation = Orientation.Horizontal,
+                enabled = enabled,
+                flingBehavior = resolvedFlingBehavior
+            )
     ) {
-        val centerPadding = remember(constraints.maxWidth, tick.spacing, density) {
-            with(density) {
-                ((constraints.maxWidth.toDp() / 2) - (tick.spacing / 2)).coerceAtLeast(0.dp)
-            }
-        }
-        val layoutDirection = LocalLayoutDirection.current
-        val resolvedPadding = remember(contentPadding, centerPadding, layoutDirection) {
-            resolveContentPadding(contentPadding, centerPadding, layoutDirection)
-        }
-
-        LazyRow(
-            state = listState,
-            userScrollEnabled = enabled,
-            contentPadding = resolvedPadding,
-            flingBehavior = resolvedFlingBehavior,
+        PickerTrackCanvas(
+            currentIndexFloat = currentIndexFloat,
+            model = model,
+            tickStyle = tick,
+            labelStyle = label,
+            contentPadding = contentPadding,
             modifier = Modifier
                 .fillMaxWidth()
-                .requiredHeightIn(min = tick.majorHeight + if (label.enabled) label.topPadding + 20.dp else 0.dp)
-        ) {
-            items(model.tickCount, key = { it }) { index ->
-                val tickValue = model.indexToValue(index)
-                PickerTick(
-                    index = index,
-                    value = tickValue,
-                    tickStyle = tick,
-                    labelStyle = label
-                )
-            }
-        }
+                .requiredHeightIn(min = trackHeight(tick, label, contentPadding))
+        )
 
         Box(modifier = Modifier.fillMaxWidth()) {
             if (centerMarker.showValueBadge) {
@@ -539,146 +579,180 @@ private fun Modifier.pickerSemantics(
 }
 
 @Composable
-private fun PickerTick(
-    index: Int,
-    value: Float,
+private fun PickerTrackCanvas(
+    currentIndexFloat: Float,
+    model: PickerModel,
     tickStyle: TickStyle,
-    labelStyle: LabelStyle
+    labelStyle: LabelStyle,
+    contentPadding: PaddingValues,
+    modifier: Modifier = Modifier
 ) {
-    val tickType = remember(index, tickStyle.mediumEvery, tickStyle.majorEvery) {
-        when {
-            tickStyle.majorEvery > 0 && index % tickStyle.majorEvery == 0 -> TickType.Major
-            tickStyle.mediumEvery > 0 && index % tickStyle.mediumEvery == 0 -> TickType.Medium
-            else -> TickType.Minor
-        }
-    }
-
+    val textMeasurer = rememberTextMeasurer()
     val colorScheme = MaterialTheme.colorScheme
-    val tickColor = when (tickType) {
-        TickType.Minor -> tickStyle.minorColor.orFallback(colorScheme.outlineVariant)
-        TickType.Medium -> tickStyle.mediumColor.orFallback(colorScheme.outline)
-        TickType.Major -> tickStyle.majorColor.orFallback(colorScheme.onSurface)
-    }
+    val labelHeight = 20.dp
+    val labelTextStyle = MaterialTheme.typography.labelSmall.merge(labelStyle.textStyle).copy(
+        color = labelStyle.color.orFallback(colorScheme.onSurfaceVariant)
+    )
 
-    val tickHeight = when (tickType) {
-        TickType.Minor -> tickStyle.minorHeight
-        TickType.Medium -> tickStyle.mediumHeight
-        TickType.Major -> tickStyle.majorHeight
-    }
+    Box(
+        modifier = modifier.drawBehind {
+            val spacingPx = tickStyle.spacing.toPx()
+            val thicknessPx = tickStyle.thickness.toPx()
+            val labelWidthPx = labelStyle.width.toPx().roundToInt().coerceAtLeast(1)
+            val topPaddingPx = contentPadding.calculateTopPadding().toPx()
+            val labelTopPaddingPx = if (labelStyle.enabled) labelStyle.topPadding.toPx() else 0f
+            val labelHeightPx = if (labelStyle.enabled) labelHeight.toPx() else 0f
+            val centerX = size.width / 2f
+            val visibleRadius = size.width / spacingPx / 2f
+            val startIndex = floor(currentIndexFloat - visibleRadius).toInt().coerceAtLeast(0)
+            val endIndex = ceil(currentIndexFloat + visibleRadius).toInt().coerceAtMost(model.lastIndex)
+            val labelTopY = topPaddingPx + tickStyle.majorHeight.toPx() + labelTopPaddingPx
 
-    val showLabel = labelStyle.enabled && labelStyle.showEvery > 0 && index % labelStyle.showEvery == 0
+            for (index in startIndex..endIndex) {
+                val tickType = when {
+                    tickStyle.majorEvery > 0 && index % tickStyle.majorEvery == 0 -> TickType.Major
+                    tickStyle.mediumEvery > 0 && index % tickStyle.mediumEvery == 0 -> TickType.Medium
+                    else -> TickType.Minor
+                }
+                val tickColor = when (tickType) {
+                    TickType.Minor -> tickStyle.minorColor.orFallback(colorScheme.outlineVariant)
+                    TickType.Medium -> tickStyle.mediumColor.orFallback(colorScheme.outline)
+                    TickType.Major -> tickStyle.majorColor.orFallback(colorScheme.onSurface)
+                }
+                val tickHeightPx = when (tickType) {
+                    TickType.Minor -> tickStyle.minorHeight.toPx()
+                    TickType.Medium -> tickStyle.mediumHeight.toPx()
+                    TickType.Major -> tickStyle.majorHeight.toPx()
+                }
+                val x = centerX + (index - currentIndexFloat) * spacingPx
 
-    Column(
-        modifier = Modifier.width(tickStyle.spacing),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Canvas(
-            modifier = Modifier
-                .width(tickStyle.thickness)
-                .height(tickHeight)
-        ) {
-            drawRect(color = tickColor)
-        }
-
-        if (showLabel) {
-            val textStyle = MaterialTheme.typography.labelSmall.merge(labelStyle.textStyle)
-            Text(
-                text = labelStyle.formatter(value),
-                modifier = Modifier
-                    .height(20.dp)
-                    .requiredWidth(labelStyle.width),
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                style = textStyle.copy(
-                    color = labelStyle.color.orFallback(colorScheme.onSurfaceVariant)
+                drawRect(
+                    color = tickColor,
+                    topLeft = Offset(x = x - thicknessPx / 2f, y = topPaddingPx),
+                    size = Size(width = thicknessPx, height = tickHeightPx)
                 )
-            )
-        } else {
-            Box(modifier = Modifier.height(labelStyle.topPadding + 20.dp))
+
+                val showLabel = labelStyle.enabled &&
+                    labelStyle.showEvery > 0 &&
+                    index % labelStyle.showEvery == 0
+                if (showLabel) {
+                    val textLayoutResult = textMeasurer.measure(
+                        text = AnnotatedString(labelStyle.formatter(model.indexToValue(index))),
+                        style = labelTextStyle,
+                        maxLines = 1,
+                        overflow = TextOverflow.Clip,
+                        constraints = Constraints(maxWidth = labelWidthPx)
+                    )
+                    drawText(
+                        textLayoutResult = textLayoutResult,
+                        topLeft = Offset(
+                            x = x - textLayoutResult.size.width / 2f,
+                            y = labelTopY + (labelHeightPx - textLayoutResult.size.height) / 2f
+                        )
+                    )
+                }
+            }
         }
-    }
-}
-
-private fun resolveContentPadding(
-    base: PaddingValues,
-    centerPadding: Dp,
-    layoutDirection: LayoutDirection
-): PaddingValues {
-    val start = base.calculateStartPadding(layoutDirection) + centerPadding
-    val end = base.calculateEndPadding(layoutDirection) + centerPadding
-
-    return PaddingValues(
-        start = start,
-        top = base.calculateTopPadding(),
-        end = end,
-        bottom = base.calculateBottomPadding()
     )
 }
 
-private fun findCenteredIndex(layoutInfo: LazyListLayoutInfo): Int? {
-    val visibleItems = layoutInfo.visibleItemsInfo
-    if (visibleItems.isEmpty()) return null
-
-    val center = (layoutInfo.viewportStartOffset + layoutInfo.viewportEndOffset) / 2f
-    return visibleItems.minByOrNull { item ->
-        abs((item.offset + item.size / 2f) - center)
-    }?.index
+private fun trackHeight(
+    tickStyle: TickStyle,
+    labelStyle: LabelStyle,
+    contentPadding: PaddingValues
+): Dp {
+    val labelSpace = if (labelStyle.enabled) labelStyle.topPadding + 20.dp else 0.dp
+    return contentPadding.calculateTopPadding() + tickStyle.majorHeight + labelSpace + contentPadding.calculateBottomPadding()
 }
 
-private fun findCenteredIndexFloat(layoutInfo: LazyListLayoutInfo): Float? {
-    val visibleItems = layoutInfo.visibleItemsInfo
-    if (visibleItems.isEmpty()) return null
-
-    val center = (layoutInfo.viewportStartOffset + layoutInfo.viewportEndOffset) / 2f
-    val centeredItem = visibleItems.minByOrNull { item ->
-        abs((item.offset + item.size / 2f) - center)
-    } ?: return null
-
-    if (centeredItem.size == 0) return centeredItem.index.toFloat()
-
-    val centeredItemCenter = centeredItem.offset + centeredItem.size / 2f
-    val offsetInItems = (center - centeredItemCenter) / centeredItem.size.toFloat()
-    return centeredItem.index + offsetInItems
-}
-
-private fun findAlignedCenteredIndex(
-    layoutInfo: LazyListLayoutInfo,
+private fun alignedCenteredIndex(
+    currentIndexFloat: Float,
+    maxIndex: Int,
+    stepPx: Float,
     alignmentTolerancePx: Float = 1f
 ): Int? {
-    val visibleItems = layoutInfo.visibleItemsInfo
-    if (visibleItems.isEmpty()) return null
+    val centeredIndex = currentIndexFloat.roundToInt().coerceIn(0, maxIndex)
+    return if (abs(currentIndexFloat - centeredIndex) * stepPx <= alignmentTolerancePx) {
+        centeredIndex
+    } else {
+        null
+    }
+}
 
-    val center = (layoutInfo.viewportStartOffset + layoutInfo.viewportEndOffset) / 2f
-    val centeredItem = visibleItems.minByOrNull { item ->
-        abs((item.offset + item.size / 2f) - center)
-    } ?: return null
-
-    val distanceToCenter = abs((centeredItem.offset + centeredItem.size / 2f) - center)
-    return if (distanceToCenter <= alignmentTolerancePx) centeredItem.index else null
+@Composable
+private fun rememberPickerSnapFlingBehavior(
+    scrollableState: androidx.compose.foundation.gestures.ScrollableState,
+    currentIndexFloat: () -> Float,
+    stepPx: () -> Float,
+    maxIndex: () -> Int
+): FlingBehavior {
+    return remember(scrollableState) {
+        object : FlingBehavior {
+            override suspend fun ScrollScope.performFling(initialVelocity: Float): Float {
+                val spacingPx = stepPx().coerceAtLeast(1f)
+                val velocityInSteps = abs(initialVelocity) / spacingPx
+                val projectedSteps = when {
+                    velocityInSteps < 10f -> 0f
+                    else -> ((velocityInSteps - 10f) / 2.8f).toDouble().pow(1.05).toFloat() * 0.3f
+                }
+                val direction = when {
+                    initialVelocity > 0f -> -1f
+                    initialVelocity < 0f -> 1f
+                    else -> 0f
+                }
+                val targetIndex = (
+                    currentIndexFloat() + (direction * projectedSteps)
+                ).roundToInt().coerceIn(0, maxIndex())
+                var previousSnapValue = 0f
+                animate(
+                    initialValue = 0f,
+                    targetValue = (currentIndexFloat() - targetIndex) * spacingPx,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = if (velocityInSteps >= 80f) {
+                            Spring.StiffnessMediumLow
+                        } else {
+                            Spring.StiffnessMedium
+                        }
+                    )
+                ) { value, _ ->
+                    val delta = value - previousSnapValue
+                    previousSnapValue = value
+                    scrollBy(delta)
+                }
+                return 0f
+            }
+        }
+    }
 }
 
 private fun Color.orFallback(fallback: Color): Color {
     return if (this == Color.Unspecified) fallback else this
 }
 
-private fun crossedAlignedIndices(from: Float, to: Float, maxIndex: Int): List<Int> {
-    if (from == to) return emptyList()
+private inline fun forEachCrossedAlignedIndex(
+    from: Float,
+    to: Float,
+    maxIndex: Int,
+    block: (Int) -> Unit
+) {
+    if (from == to) return
 
-    return if (to > from) {
+    if (to > from) {
         val start = kotlin.math.floor(from).toInt() + 1
         val end = kotlin.math.floor(to).toInt()
-        if (end < start) {
-            emptyList()
-        } else {
-            (start..end).map { it.coerceIn(0, maxIndex) }
+        if (end >= start) {
+            for (index in start..end) {
+                block(index.coerceIn(0, maxIndex))
+            }
         }
     } else {
         val start = kotlin.math.ceil(from).toInt() - 1
         val end = kotlin.math.ceil(to).toInt()
-        if (start < end) {
-            emptyList()
-        } else {
-            (start downTo end).map { it.coerceIn(0, maxIndex) }
+        if (start >= end) {
+            for (index in start downTo end) {
+                block(index.coerceIn(0, maxIndex))
+            }
         }
     }
 }

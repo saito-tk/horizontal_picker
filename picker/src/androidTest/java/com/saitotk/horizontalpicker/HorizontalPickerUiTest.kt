@@ -5,8 +5,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
@@ -74,5 +76,70 @@ class HorizontalPickerUiTest {
 
         val doubled = value * 2f
         assertTrue(abs(doubled - round(doubled)) < 0.0001f)
+    }
+
+    @Test
+    fun secondSwipe_isStillAccepted() {
+        var value by mutableFloatStateOf(10f)
+
+        composeRule.setContent {
+            MaterialTheme {
+                HorizontalPicker(
+                    value = value,
+                    onValueChange = { value = it },
+                    valueRange = 0f..20f,
+                    step = 1f,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("picker")
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("picker").performTouchInput {
+            swipeLeft()
+        }
+        composeRule.waitForIdle()
+        val afterFirstSwipe = value
+
+        composeRule.onNodeWithTag("picker").performTouchInput {
+            swipeLeft()
+        }
+        composeRule.waitForIdle()
+
+        assertNotEquals(afterFirstSwipe, value)
+    }
+
+    @Test
+    fun edgeTap_movesByOneStepOnBothSides() {
+        var value by mutableFloatStateOf(10f)
+
+        composeRule.setContent {
+            MaterialTheme {
+                HorizontalPicker(
+                    value = value,
+                    onValueChange = { value = it },
+                    valueRange = 0f..20f,
+                    step = 1f,
+                    edgeTapZoneFraction = 0.3f,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("picker")
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("picker").performTouchInput {
+            click(Offset(1f, 1f))
+        }
+        composeRule.waitForIdle()
+        assertTrue(value < 10f)
+
+        val afterLeftTap = value
+        composeRule.onNodeWithTag("picker").performTouchInput {
+            click(Offset(width - 1f, 1f))
+        }
+        composeRule.waitForIdle()
+        assertTrue(value > afterLeftTap)
     }
 }
