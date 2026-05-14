@@ -6,7 +6,7 @@ Jetpack Compose 向けの横スクロール式 Picker ライブラリです。�
 - minSdk `21+`
 - `Float` / `Int` API を提供
 - スナップ、haptic、アクセシビリティ、RTL に対応
-- 広いレンジでも扱いやすい軽量な描画実装
+- `Canvas + scrollable` ベースの軽量描画実装
 
 ## デモ
 
@@ -60,6 +60,7 @@ HorizontalPicker(
 - 高速フリング時も、通過した step を補間して値更新と haptic を行います。
 - 外部 state の反映で発生するプログラム的なスクロール中は haptic を抑制します。
 - デフォルトでは速度に応じた移動量を持つスナップ付き fling を使います。
+- 描画は `Canvas` ベースで、可視範囲の tick と label だけを毎フレーム描画します。
 
 ## カスタマイズ
 
@@ -124,20 +125,22 @@ HorizontalPicker(
 )
 ```
 
-`edgeTapZoneFraction = 0f` のときは無効です。`0.1f..0.5f` を指定すると、マーカー上部の左右端タップで 1 step ずつ移動できます。
+`edgeTapZoneFraction = 0f` のときは無効です。`0.1f..0.5f` を指定すると、マーカー上部の左右端をタップしたときに 1 step ずつ移動できます。
 
 `edgeTapZoneFraction` は、コンポーネント全体の幅に対して左右それぞれ何割を端タップ領域にするかを表します。
 
 - `0.1f` なら左 10% と右 10%
 - `0.3f` なら左 30% と右 30%
 - 判定されるのはマーカー上部のオーバーレイ領域内だけです
+- ドラッグに入った場合は端タップとして扱われません
+- 現状、端タップの長押しオートリピートはありません
 
 ## 主な引数
 
 - `tick: TickStyle`
-  目盛りの間隔、高さ、太さ、色、`mediumEvery`、`majorEvery` を指定します。
+  目盛りの間隔、高さ、太さ、色、`mediumEvery`、`majorEvery` を指定します。`mediumEvery <= 0` または `majorEvery <= 0` にすると、その種別の目盛りは出ません。
 - `label: LabelStyle`
-  ラベルの有無、表示間隔、幅、文字色、フォーマッタを指定します。
+  ラベルの有無、表示間隔、幅、文字色、フォーマッタを指定します。`enabled = false` または `showEvery <= 0` でラベルを非表示にできます。
 - `centerMarker: CenterMarkerStyle`
   中央マーカーの色、幅、高さ、値バッジ表示を指定します。
 - `valueBadge`
@@ -147,19 +150,20 @@ HorizontalPicker(
 - `flingBehavior`
   デフォルトは速度に応じた移動量を持つスナップ挙動です。独自の `FlingBehavior` を渡せます。
 - `edgeTapZoneFraction`
-  `0f` で無効です。`0.1f..0.5f` を指定すると、上部の左右端タップで 1 step 移動できます。
+  `0f` で無効です。`0.1f..0.5f` を指定すると、上部の左右端をタップしたときに 1 step 移動できます。
 - `enabled`
   `false` でスクロールと端タップを無効化します。
 
 ## 制約と注意点
 
 - `Float` API の `step` は `> 0f`、`Int` API の `step` は `> 0` が必要です。
-- `valueRange.start <= valueRange.endInclusive` である必要があります。
+- `Float` API は `valueRange.start <= valueRange.endInclusive`、`Int` API は `range.first <= range.last` が必要です。
 - 選択可能な値は `start + n * step` です。
 - `valueRange` と `step` が割り切れない場合、上限ぴったりの値は選択できないことがあります。
   例: `0f..10f` と `step = 3f` の選択値は `0, 3, 6, 9` です。
 - `edgeTapZoneFraction` は `0f` または `0.1f..0.5f` で指定します。
 - デフォルトの値バッジ表示は `step` に応じて小数桁数を自動決定し、最大 6 桁まで表示します。
+- tick 数が極端に多い構成は拒否されます。`Too many ticks. Reduce range size or increase step.` が出た場合は、レンジを狭めるか `step` を大きくしてください。
 
 ## 公開 API
 
