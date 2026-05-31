@@ -24,8 +24,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeightIn
 import androidx.compose.foundation.layout.requiredWidthIn
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.progressSemantics
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -51,10 +49,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -630,10 +628,7 @@ enum class PickerContentRotation(val degrees: Float) {
     CounterClockwise(-90f)
 }
 
-private val VerticalCenterMarkerOffset = 48.dp
-private val VerticalCenterMarkerLineNudge = 6.dp
-private val VerticalCenterMarkerLabelNudge = 3.dp
-private val VerticalValueBadgeHalfWidth = 12.dp
+private val VerticalCenterMarkerContentEdgeOffset = 42.dp
 
 /** Default selection stem used by [HorizontalPicker]. */
 @Composable
@@ -663,7 +658,7 @@ fun BoxScope.DefaultVerticalSelectionStem(
     Box(
         modifier = modifier
             .align(Alignment.CenterEnd)
-            .offset(x = VerticalCenterMarkerOffset + VerticalCenterMarkerLineNudge - VerticalValueBadgeHalfWidth)
+            .offset(x = VerticalCenterMarkerContentEdgeOffset)
             .width(width)
             .height(height)
             .background(color, RoundedCornerShape(percent = 50))
@@ -717,31 +712,43 @@ fun BoxScope.DefaultVerticalValueBadge(
     modifier: Modifier = Modifier,
     contentRotation: PickerContentRotation = PickerContentRotation.None
 ) {
-    Box(
+    Layout(
+        content = {
+            Text(
+                text = valueText,
+                modifier = Modifier
+                    .background(
+                        color = color,
+                        shape = RoundedCornerShape(
+                            topStart = 8.dp,
+                            topEnd = 8.dp,
+                            bottomStart = 8.dp,
+                            bottomEnd = 8.dp
+                        )
+                    )
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White
+            )
+        },
         modifier = modifier
             .align(Alignment.CenterEnd)
-            .offset(x = VerticalCenterMarkerOffset + VerticalCenterMarkerLabelNudge)
-            .size(0.dp)
-    ) {
-        Text(
-            text = valueText,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .wrapContentSize(unbounded = true)
-                .graphicsLayer(rotationZ = contentRotation.degrees)
-                .background(
-                    color = color,
-                    shape = RoundedCornerShape(
-                        topStart = 8.dp,
-                        topEnd = 8.dp,
-                        bottomStart = 8.dp,
-                        bottomEnd = 8.dp
-                    )
-                )
-                .padding(horizontal = 8.dp, vertical = 3.dp),
-            style = MaterialTheme.typography.labelMedium,
-            color = Color.White
+            .offset(x = VerticalCenterMarkerContentEdgeOffset)
+    ) { measurables, constraints ->
+        val placeable = measurables.single().measure(
+            constraints.copy(minWidth = 0, minHeight = 0)
         )
+        layout(width = 0, height = 0) {
+            val x = if (contentRotation == PickerContentRotation.None) {
+                0
+            } else {
+                ((placeable.height - placeable.width) / 2f).roundToInt()
+            }
+            val y = (-placeable.height / 2f).roundToInt()
+            placeable.placeRelativeWithLayer(x = x, y = y) {
+                rotationZ = contentRotation.degrees
+            }
+        }
     }
 }
 
