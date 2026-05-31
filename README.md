@@ -4,7 +4,7 @@ Jetpack Compose 向けの横スクロール式 Picker ライブラリです。�
 
 - Compose 専用
 - minSdk `21+`
-- `Float` / `Int` API を提供
+- 横向き/縦向きの `Float` / `Int` API を提供
 - スナップ、haptic、アクセシビリティ、RTL に対応
 - `Canvas + scrollable` ベースの軽量描画実装
 
@@ -49,6 +49,34 @@ HorizontalPicker(
     onValueChange = { age = it },  // 値変更時の反映先
     range = 0..120,              // 選択可能な範囲
     step = 1                     // 1 tick あたりの増減幅
+)
+```
+
+### 縦向き表示
+
+`HorizontalPicker` を `Modifier.rotate(90f)` で回転させると、見た目とスクロール入力の座標軸がずれてフリングが安定しません。縦向きで表示したい場合は `VerticalPicker` を使ってください。
+
+```kotlin
+VerticalPicker(
+    value = weight,
+    onValueChange = { weight = it },
+    valueRange = 0f..100f,
+    step = 0.5f,
+    modifier = Modifier
+        .fillMaxHeight()
+        .width(120.dp)
+)
+```
+
+Activity を portrait のまま固定し、端末を横向きに持って見る用途では、ラベルとデフォルト値バッジだけを回転できます。
+
+```kotlin
+VerticalPicker(
+    value = weight,
+    onValueChange = { weight = it },
+    valueRange = 0f..100f,
+    step = 0.5f,
+    contentRotation = PickerContentRotation.Clockwise
 )
 ```
 
@@ -128,6 +156,7 @@ HorizontalPicker(
 `edgeTapZoneFraction = 0f` のときは無効です。`0.1f..0.5f` を指定すると、マーカー上部の左右端をタップしたときに 1 step ずつ移動できます。
 
 `edgeTapZoneFraction` は、コンポーネント全体の幅に対して左右それぞれ何割を端タップ領域にするかを表します。
+`VerticalPicker` では高さに対する上下端の割合として扱われます。
 
 - `0.1f` なら左 10% と右 10%
 - `0.3f` なら左 30% と右 30%
@@ -145,12 +174,14 @@ HorizontalPicker(
   中央マーカーの色、幅、高さ、値バッジ表示を指定します。
 - `valueBadge`
   選択中の値バッジを差し替えます。引数は整形済み文字列とマーカー色です。
+- `contentRotation`
+  `VerticalPicker` のラベルとデフォルト値バッジの向きを指定します。Activity を portrait 固定のまま端末横向きで見る場合は `Clockwise` または `CounterClockwise` を指定します。
 - `haptics`
   `null` を渡すと haptic を無効化できます。
 - `flingBehavior`
   デフォルトは速度に応じた移動量を持つスナップ挙動です。独自の `FlingBehavior` を渡せます。
 - `edgeTapZoneFraction`
-  `0f` で無効です。`0.1f..0.5f` を指定すると、上部の左右端をタップしたときに 1 step 移動できます。
+  `0f` で無効です。`0.1f..0.5f` を指定すると、`HorizontalPicker` は上部の左右端、`VerticalPicker` は左側の上下端をタップしたときに 1 step 移動できます。
 - `enabled`
   `false` でスクロールと端タップを無効化します。
 
@@ -207,4 +238,52 @@ fun HorizontalPicker(
     edgeTapZoneFraction: Float = 0f,
     enabled: Boolean = true
 )
+
+@Composable
+fun VerticalPicker(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    step: Float,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp),
+    flingBehavior: FlingBehavior = PickerDefaults.SnapFlingBehavior,
+    centerMarker: CenterMarkerStyle = CenterMarkerStyle(),
+    contentRotation: PickerContentRotation = PickerContentRotation.None,
+    valueBadge: @Composable BoxScope.(valueText: String, color: Color) -> Unit = { valueText, color ->
+        DefaultVerticalValueBadge(valueText = valueText, color = color, contentRotation = contentRotation)
+    },
+    tick: TickStyle = TickStyle(),
+    label: LabelStyle = LabelStyle(),
+    haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
+    edgeTapZoneFraction: Float = 0f,
+    enabled: Boolean = true
+)
+
+@Composable
+fun VerticalPicker(
+    value: Int,
+    onValueChange: (Int) -> Unit,
+    range: IntRange,
+    step: Int,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp),
+    flingBehavior: FlingBehavior = PickerDefaults.SnapFlingBehavior,
+    centerMarker: CenterMarkerStyle = CenterMarkerStyle(),
+    contentRotation: PickerContentRotation = PickerContentRotation.None,
+    valueBadge: @Composable BoxScope.(valueText: String, color: Color) -> Unit = { valueText, color ->
+        DefaultVerticalValueBadge(valueText = valueText, color = color, contentRotation = contentRotation)
+    },
+    tick: TickStyle = TickStyle(),
+    label: LabelStyle = LabelStyle(formatter = { it.roundToInt().toString() }),
+    haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
+    edgeTapZoneFraction: Float = 0f,
+    enabled: Boolean = true
+)
+
+enum class PickerContentRotation {
+    None,
+    Clockwise,
+    CounterClockwise
+}
 ```

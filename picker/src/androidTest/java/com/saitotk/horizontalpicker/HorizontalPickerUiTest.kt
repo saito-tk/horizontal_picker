@@ -1,6 +1,8 @@
 package com.saitotk.horizontalpicker
 
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -13,6 +15,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -141,5 +145,32 @@ class HorizontalPickerUiTest {
         }
         composeRule.waitForIdle()
         assertTrue(value > afterLeftTap)
+    }
+
+    @Test
+    fun verticalPicker_swipe_updatesValue() {
+        var value by mutableFloatStateOf(10f)
+
+        composeRule.setContent {
+            MaterialTheme {
+                VerticalPicker(
+                    value = value,
+                    onValueChange = { value = it },
+                    valueRange = 0f..20f,
+                    step = 1f,
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(120.dp)
+                        .testTag("picker")
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("picker").performTouchInput {
+            swipeUp()
+        }
+        composeRule.waitForIdle()
+
+        assertNotEquals(10f, value)
     }
 }

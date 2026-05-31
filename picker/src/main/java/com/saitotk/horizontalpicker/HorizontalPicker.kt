@@ -15,12 +15,15 @@ import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeightIn
-import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.foundation.layout.requiredWidthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.progressSemantics
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,6 +48,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -60,7 +65,6 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
@@ -99,6 +103,91 @@ fun HorizontalPicker(
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
     edgeTapZoneFraction: Float = 0f,
     enabled: Boolean = true
+) {
+    Picker(
+        orientation = PickerOrientation.Horizontal,
+        value = value,
+        onValueChange = onValueChange,
+        valueRange = valueRange,
+        step = step,
+        modifier = modifier,
+        contentPadding = contentPadding,
+        flingBehavior = flingBehavior,
+        centerMarker = centerMarker,
+        contentRotation = PickerContentRotation.None,
+        valueBadge = valueBadge,
+        tick = tick,
+        label = label,
+        haptics = haptics,
+        edgeTapZoneFraction = edgeTapZoneFraction,
+        enabled = enabled
+    )
+}
+
+/**
+ * Selects a value by vertically scrolling ticks under a fixed center indicator.
+ *
+ * Use this instead of rotating [HorizontalPicker] when the picker should be displayed at 90 degrees.
+ * The gesture axis, fling velocity, drawing axis, and edge tap zones all use vertical coordinates.
+ */
+@Composable
+fun VerticalPicker(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    step: Float,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp),
+    flingBehavior: FlingBehavior = PickerDefaults.SnapFlingBehavior,
+    centerMarker: CenterMarkerStyle = CenterMarkerStyle(),
+    contentRotation: PickerContentRotation = PickerContentRotation.None,
+    valueBadge: @Composable BoxScope.(valueText: String, color: Color) -> Unit = { valueText, color ->
+        DefaultVerticalValueBadge(valueText = valueText, color = color, contentRotation = contentRotation)
+    },
+    tick: TickStyle = TickStyle(),
+    label: LabelStyle = LabelStyle(),
+    haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
+    edgeTapZoneFraction: Float = 0f,
+    enabled: Boolean = true
+) {
+    Picker(
+        orientation = PickerOrientation.Vertical,
+        value = value,
+        onValueChange = onValueChange,
+        valueRange = valueRange,
+        step = step,
+        modifier = modifier,
+        contentPadding = contentPadding,
+        flingBehavior = flingBehavior,
+        centerMarker = centerMarker,
+        contentRotation = contentRotation,
+        valueBadge = valueBadge,
+        tick = tick,
+        label = label,
+        haptics = haptics,
+        edgeTapZoneFraction = edgeTapZoneFraction,
+        enabled = enabled
+    )
+}
+
+@Composable
+private fun Picker(
+    orientation: PickerOrientation,
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    step: Float,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues,
+    flingBehavior: FlingBehavior,
+    centerMarker: CenterMarkerStyle,
+    contentRotation: PickerContentRotation,
+    valueBadge: @Composable BoxScope.(valueText: String, color: Color) -> Unit,
+    tick: TickStyle,
+    label: LabelStyle,
+    haptics: HapticFeedbackType?,
+    edgeTapZoneFraction: Float,
+    enabled: Boolean
 ) {
     require(edgeTapZoneFraction == 0f || edgeTapZoneFraction in 0.1f..0.5f) {
         "edgeTapZoneFraction must be 0f (off) or in 0.1f..0.5f"
@@ -302,12 +391,19 @@ fun HorizontalPicker(
         formatSelectedValueForBadge(reportedValue, step)
     }
     val centerMarkerColor = centerMarker.color.orFallback(MaterialTheme.colorScheme.primary)
-    val edgeTapOverlayHeight = maxOf(
-        contentPadding.calculateTopPadding() + centerMarker.stemHeight,
-        centerMarker.stemHeight + if (centerMarker.showValueBadge) 20.dp else 0.dp
-    )
-    val edgeTapOverlayHeightPx = remember(density, edgeTapOverlayHeight) {
-        with(density) { edgeTapOverlayHeight.toPx() }
+    val layoutDirection = LocalLayoutDirection.current
+    val edgeTapOverlayCrossAxisSize = when (orientation) {
+        PickerOrientation.Horizontal -> maxOf(
+            contentPadding.calculateTopPadding() + centerMarker.stemHeight,
+            centerMarker.stemHeight + if (centerMarker.showValueBadge) 20.dp else 0.dp
+        )
+        PickerOrientation.Vertical -> maxOf(
+            contentPadding.calculateStartPadding(layoutDirection) + centerMarker.stemHeight,
+            centerMarker.stemHeight + if (centerMarker.showValueBadge) 20.dp else 0.dp
+        )
+    }
+    val edgeTapOverlayCrossAxisSizePx = remember(density, edgeTapOverlayCrossAxisSize) {
+        with(density) { edgeTapOverlayCrossAxisSize.toPx() }
     }
     fun requestEdgeTapStep(delta: Int) {
         if (!edgeTapStepEnabled || !enabled || delta == 0) return
@@ -329,11 +425,25 @@ fun HorizontalPicker(
         }
     }
 
+    val axisFillModifier = when (orientation) {
+        PickerOrientation.Horizontal -> Modifier.fillMaxWidth()
+        PickerOrientation.Vertical -> Modifier.fillMaxHeight()
+    }
+    val trackModifier = when (orientation) {
+        PickerOrientation.Horizontal -> Modifier
+            .fillMaxWidth()
+            .requiredHeightIn(min = trackHeight(tick, label, contentPadding))
+        PickerOrientation.Vertical -> Modifier
+            .fillMaxHeight()
+            .requiredWidthIn(min = trackWidth(tick, label, contentPadding, layoutDirection))
+    }
+
     Box(
         modifier = modifier
-            .fillMaxWidth()
+            .then(axisFillModifier)
             .pickerSemantics(
                 enabled = enabled,
+                contentDescription = orientation.contentDescription,
                 valueLabel = semanticsLabel,
                 currentIndex = selectedIndex,
                 maxIndex = model.lastIndex,
@@ -353,21 +463,24 @@ fun HorizontalPicker(
                 edgeTapStepEnabled,
                 enabled,
                 edgeTapZoneFraction,
-                edgeTapOverlayHeightPx,
+                edgeTapOverlayCrossAxisSizePx,
+                orientation,
                 model.lastIndex
             ) {
-                if (!edgeTapStepEnabled || !enabled || edgeTapZoneFraction <= 0f || edgeTapOverlayHeightPx <= 0f) {
+                if (!edgeTapStepEnabled || !enabled || edgeTapZoneFraction <= 0f || edgeTapOverlayCrossAxisSizePx <= 0f) {
                     return@pointerInput
                 }
 
                 awaitEachGesture {
                     val down = awaitFirstPointerDown()
-                    val zoneWidth = size.width.toFloat() * edgeTapZoneFraction
+                    val mainAxisSize = orientation.mainAxisSize(size.width.toFloat(), size.height.toFloat())
+                    val zoneSize = mainAxisSize * edgeTapZoneFraction
                     val delta = edgeTapStepDelta(
                         downPosition = down.position,
-                        width = size.width.toFloat(),
-                        zoneWidth = zoneWidth,
-                        overlayHeight = edgeTapOverlayHeightPx
+                        orientation = orientation,
+                        mainAxisSize = mainAxisSize,
+                        zoneSize = zoneSize,
+                        overlayCrossAxisSize = edgeTapOverlayCrossAxisSizePx
                     )
                     val releasedAsTap = awaitReleaseWithoutDrag(
                         pointerId = down.id,
@@ -382,7 +495,7 @@ fun HorizontalPicker(
             }
             .scrollable(
                 state = scrollableState,
-                orientation = Orientation.Horizontal,
+                orientation = orientation.scrollableOrientation,
                 enabled = enabled,
                 flingBehavior = resolvedFlingBehavior
             )
@@ -393,20 +506,27 @@ fun HorizontalPicker(
             tickStyle = tick,
             labelStyle = label,
             contentPadding = contentPadding,
-            modifier = Modifier
-                .fillMaxWidth()
-                .requiredHeightIn(min = trackHeight(tick, label, contentPadding))
+            orientation = orientation,
+            contentRotation = contentRotation,
+            modifier = trackModifier
         )
 
-        Box(modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = axisFillModifier) {
             if (centerMarker.showValueBadge) {
                 valueBadge(selectedValueLabel, centerMarkerColor)
             }
-            DefaultSelectionStem(
-                color = centerMarkerColor,
-                width = centerMarker.stemWidth,
-                height = centerMarker.stemHeight
-            )
+            when (orientation) {
+                PickerOrientation.Horizontal -> DefaultSelectionStem(
+                    color = centerMarkerColor,
+                    width = centerMarker.stemWidth,
+                    height = centerMarker.stemHeight
+                )
+                PickerOrientation.Vertical -> DefaultVerticalSelectionStem(
+                    color = centerMarkerColor,
+                    width = centerMarker.stemHeight,
+                    height = centerMarker.stemWidth
+                )
+            }
         }
     }
 }
@@ -451,6 +571,48 @@ fun HorizontalPicker(
     )
 }
 
+/** Int overload for [VerticalPicker]. */
+@Composable
+fun VerticalPicker(
+    value: Int,
+    onValueChange: (Int) -> Unit,
+    range: IntRange,
+    step: Int,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp),
+    flingBehavior: FlingBehavior = PickerDefaults.SnapFlingBehavior,
+    centerMarker: CenterMarkerStyle = CenterMarkerStyle(),
+    contentRotation: PickerContentRotation = PickerContentRotation.None,
+    valueBadge: @Composable BoxScope.(valueText: String, color: Color) -> Unit = { valueText, color ->
+        DefaultVerticalValueBadge(valueText = valueText, color = color, contentRotation = contentRotation)
+    },
+    tick: TickStyle = TickStyle(),
+    label: LabelStyle = LabelStyle(formatter = { it.roundToInt().toString() }),
+    haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
+    edgeTapZoneFraction: Float = 0f,
+    enabled: Boolean = true
+) {
+    require(step > 0) { "step must be > 0" }
+
+    VerticalPicker(
+        value = value.toFloat(),
+        onValueChange = { onValueChange(it.roundToInt()) },
+        valueRange = range.first.toFloat()..range.last.toFloat(),
+        step = step.toFloat(),
+        modifier = modifier,
+        contentPadding = contentPadding,
+        flingBehavior = flingBehavior,
+        centerMarker = centerMarker,
+        contentRotation = contentRotation,
+        valueBadge = valueBadge,
+        tick = tick,
+        label = label,
+        haptics = haptics,
+        edgeTapZoneFraction = edgeTapZoneFraction,
+        enabled = enabled
+    )
+}
+
 @Immutable
 data class CenterMarkerStyle(
     val color: Color = Color.Unspecified,
@@ -458,6 +620,13 @@ data class CenterMarkerStyle(
     val stemHeight: Dp = 26.dp,
     val showValueBadge: Boolean = true
 )
+
+/** Rotation applied to labels and the default vertical value badge. */
+enum class PickerContentRotation(val degrees: Float) {
+    None(0f),
+    Clockwise(90f),
+    CounterClockwise(-90f)
+}
 
 /** Default selection stem used by [HorizontalPicker]. */
 @Composable
@@ -470,6 +639,23 @@ fun BoxScope.DefaultSelectionStem(
     Box(
         modifier = modifier
             .align(Alignment.TopCenter)
+            .width(width)
+            .height(height)
+            .background(color, RoundedCornerShape(percent = 50))
+    )
+}
+
+/** Default selection stem used by [VerticalPicker]. */
+@Composable
+fun BoxScope.DefaultVerticalSelectionStem(
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary,
+    width: Dp = 26.dp,
+    height: Dp = 4.dp
+) {
+    Box(
+        modifier = modifier
+            .align(Alignment.CenterStart)
             .width(width)
             .height(height)
             .background(color, RoundedCornerShape(percent = 50))
@@ -500,6 +686,35 @@ fun BoxScope.DefaultValueBadge(
         modifier = modifier
             .align(Alignment.TopCenter)
             .offset(y = (-20).dp)
+            .background(
+                color = color,
+                shape = RoundedCornerShape(
+                    topStart = 8.dp,
+                    topEnd = 8.dp,
+                    bottomStart = 8.dp,
+                    bottomEnd = 8.dp
+                )
+            )
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        style = MaterialTheme.typography.labelMedium,
+        color = Color.White
+    )
+}
+
+/** Default value badge used by [VerticalPicker]. */
+@Composable
+fun BoxScope.DefaultVerticalValueBadge(
+    valueText: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+    contentRotation: PickerContentRotation = PickerContentRotation.None
+) {
+    Text(
+        text = valueText,
+        modifier = modifier
+            .align(Alignment.CenterStart)
+            .offset(x = (-20).dp)
+            .graphicsLayer(rotationZ = contentRotation.degrees)
             .background(
                 color = color,
                 shape = RoundedCornerShape(
@@ -569,8 +784,24 @@ private enum class TickType {
     Major
 }
 
+internal enum class PickerOrientation(
+    val scrollableOrientation: Orientation,
+    val contentDescription: String
+) {
+    Horizontal(Orientation.Horizontal, "Horizontal picker"),
+    Vertical(Orientation.Vertical, "Vertical picker");
+
+    fun mainAxisSize(width: Float, height: Float): Float {
+        return when (this) {
+            Horizontal -> width
+            Vertical -> height
+        }
+    }
+}
+
 private fun Modifier.pickerSemantics(
     enabled: Boolean,
+    contentDescription: String,
     valueLabel: String,
     currentIndex: Int,
     maxIndex: Int,
@@ -578,7 +809,7 @@ private fun Modifier.pickerSemantics(
     onDecrease: () -> Unit
 ): Modifier {
     return semantics(mergeDescendants = true) {
-        contentDescription = "Horizontal picker"
+        this.contentDescription = contentDescription
         stateDescription = valueLabel
 
         if (enabled) {
@@ -614,10 +845,13 @@ private fun PickerTrackCanvas(
     tickStyle: TickStyle,
     labelStyle: LabelStyle,
     contentPadding: PaddingValues,
+    orientation: PickerOrientation,
+    contentRotation: PickerContentRotation,
     modifier: Modifier = Modifier
 ) {
     val textMeasurer = rememberTextMeasurer()
     val colorScheme = MaterialTheme.colorScheme
+    val layoutDirection = LocalLayoutDirection.current
     val labelHeight = 20.dp
     val labelTextStyle = MaterialTheme.typography.labelSmall.merge(labelStyle.textStyle).copy(
         color = labelStyle.color.orFallback(colorScheme.onSurfaceVariant)
@@ -629,13 +863,16 @@ private fun PickerTrackCanvas(
             val thicknessPx = tickStyle.thickness.toPx()
             val labelWidthPx = labelStyle.width.toPx().roundToInt().coerceAtLeast(1)
             val topPaddingPx = contentPadding.calculateTopPadding().toPx()
+            val startPaddingPx = contentPadding.calculateStartPadding(layoutDirection).toPx()
             val labelTopPaddingPx = if (labelStyle.enabled) labelStyle.topPadding.toPx() else 0f
             val labelHeightPx = if (labelStyle.enabled) labelHeight.toPx() else 0f
-            val centerX = size.width / 2f
-            val visibleRadius = size.width / spacingPx / 2f
+            val mainAxisSize = orientation.mainAxisSize(size.width, size.height)
+            val centerOnMainAxis = mainAxisSize / 2f
+            val visibleRadius = mainAxisSize / spacingPx / 2f
             val startIndex = floor(currentIndexFloat - visibleRadius).toInt().coerceAtLeast(0)
             val endIndex = ceil(currentIndexFloat + visibleRadius).toInt().coerceAtMost(model.lastIndex)
             val labelTopY = topPaddingPx + tickStyle.majorHeight.toPx() + labelTopPaddingPx
+            val labelStartX = startPaddingPx + tickStyle.majorHeight.toPx() + labelTopPaddingPx
 
             for (index in startIndex..endIndex) {
                 val tickType = when {
@@ -653,13 +890,26 @@ private fun PickerTrackCanvas(
                     TickType.Medium -> tickStyle.mediumHeight.toPx()
                     TickType.Major -> tickStyle.majorHeight.toPx()
                 }
-                val x = centerX + (index - currentIndexFloat) * spacingPx
+                val positionOnMainAxis = centerOnMainAxis + (index - currentIndexFloat) * spacingPx
 
-                drawRect(
-                    color = tickColor,
-                    topLeft = Offset(x = x - thicknessPx / 2f, y = topPaddingPx),
-                    size = Size(width = thicknessPx, height = tickHeightPx)
-                )
+                when (orientation) {
+                    PickerOrientation.Horizontal -> drawRect(
+                        color = tickColor,
+                        topLeft = Offset(
+                            x = positionOnMainAxis - thicknessPx / 2f,
+                            y = topPaddingPx
+                        ),
+                        size = Size(width = thicknessPx, height = tickHeightPx)
+                    )
+                    PickerOrientation.Vertical -> drawRect(
+                        color = tickColor,
+                        topLeft = Offset(
+                            x = startPaddingPx,
+                            y = positionOnMainAxis - thicknessPx / 2f
+                        ),
+                        size = Size(width = tickHeightPx, height = thicknessPx)
+                    )
+                }
 
                 val showLabel = labelStyle.enabled &&
                     labelStyle.showEvery > 0 &&
@@ -672,13 +922,45 @@ private fun PickerTrackCanvas(
                         overflow = TextOverflow.Clip,
                         constraints = Constraints(maxWidth = labelWidthPx)
                     )
-                    drawText(
-                        textLayoutResult = textLayoutResult,
-                        topLeft = Offset(
-                            x = x - textLayoutResult.size.width / 2f,
-                            y = labelTopY + (labelHeightPx - textLayoutResult.size.height) / 2f
+                    when (orientation) {
+                        PickerOrientation.Horizontal -> drawText(
+                            textLayoutResult = textLayoutResult,
+                            topLeft = Offset(
+                                x = positionOnMainAxis - textLayoutResult.size.width / 2f,
+                                y = labelTopY + (labelHeightPx - textLayoutResult.size.height) / 2f
+                            )
                         )
-                    )
+                        PickerOrientation.Vertical -> {
+                            val textCenter = if (contentRotation == PickerContentRotation.None) {
+                                Offset(
+                                    x = labelStartX + textLayoutResult.size.width / 2f,
+                                    y = positionOnMainAxis
+                                )
+                            } else {
+                                Offset(
+                                    x = labelStartX + labelHeightPx / 2f,
+                                    y = positionOnMainAxis
+                                )
+                            }
+                            val textTopLeft = Offset(
+                                x = textCenter.x - textLayoutResult.size.width / 2f,
+                                y = textCenter.y - textLayoutResult.size.height / 2f
+                            )
+                            if (contentRotation == PickerContentRotation.None) {
+                                drawText(
+                                    textLayoutResult = textLayoutResult,
+                                    topLeft = textTopLeft
+                                )
+                            } else {
+                                rotate(degrees = contentRotation.degrees, pivot = textCenter) {
+                                    drawText(
+                                        textLayoutResult = textLayoutResult,
+                                        topLeft = textTopLeft
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -692,6 +974,19 @@ private fun trackHeight(
 ): Dp {
     val labelSpace = if (labelStyle.enabled) labelStyle.topPadding + 20.dp else 0.dp
     return contentPadding.calculateTopPadding() + tickStyle.majorHeight + labelSpace + contentPadding.calculateBottomPadding()
+}
+
+private fun trackWidth(
+    tickStyle: TickStyle,
+    labelStyle: LabelStyle,
+    contentPadding: PaddingValues,
+    layoutDirection: androidx.compose.ui.unit.LayoutDirection
+): Dp {
+    val labelSpace = if (labelStyle.enabled) labelStyle.topPadding + labelStyle.width else 0.dp
+    return contentPadding.calculateStartPadding(layoutDirection) +
+        tickStyle.majorHeight +
+        labelSpace +
+        contentPadding.calculateEndPadding(layoutDirection)
 }
 
 private fun alignedCenteredIndex(
@@ -835,15 +1130,29 @@ private suspend fun androidx.compose.ui.input.pointer.AwaitPointerEventScope.awa
 
 internal fun edgeTapStepDelta(
     downPosition: Offset,
-    width: Float,
-    zoneWidth: Float,
-    overlayHeight: Float
+    orientation: PickerOrientation,
+    mainAxisSize: Float,
+    zoneSize: Float,
+    overlayCrossAxisSize: Float
 ): Int {
-    if (zoneWidth <= 0f || downPosition.y > overlayHeight) return 0
-    return when {
-        downPosition.x <= zoneWidth -> -1
-        downPosition.x >= width - zoneWidth -> 1
-        else -> 0
+    if (zoneSize <= 0f) return 0
+    return when (orientation) {
+        PickerOrientation.Horizontal -> {
+            if (downPosition.y > overlayCrossAxisSize) return 0
+            when {
+                downPosition.x <= zoneSize -> -1
+                downPosition.x >= mainAxisSize - zoneSize -> 1
+                else -> 0
+            }
+        }
+        PickerOrientation.Vertical -> {
+            if (downPosition.x > overlayCrossAxisSize) return 0
+            when {
+                downPosition.y <= zoneSize -> -1
+                downPosition.y >= mainAxisSize - zoneSize -> 1
+                else -> 0
+            }
+        }
     }
 }
 

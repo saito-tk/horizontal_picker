@@ -7,11 +7,15 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +28,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -32,7 +37,9 @@ import androidx.compose.ui.unit.dp
 import com.saitotk.horizontalpicker.CenterMarkerStyle
 import com.saitotk.horizontalpicker.HorizontalPicker
 import com.saitotk.horizontalpicker.LabelStyle
+import com.saitotk.horizontalpicker.PickerContentRotation
 import com.saitotk.horizontalpicker.TickStyle
+import com.saitotk.horizontalpicker.VerticalPicker
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
@@ -54,6 +61,7 @@ private fun SampleScreen() {
     var integerValue by rememberSaveable { mutableIntStateOf(0) }
     var floatValue by rememberSaveable { mutableFloatStateOf(37.5f) }
     var customValue by rememberSaveable { mutableFloatStateOf(500f) }
+    var verticalValue by rememberSaveable { mutableFloatStateOf(50f) }
 
     LazyColumn(
         modifier = Modifier
@@ -90,6 +98,52 @@ private fun SampleScreen() {
                 ),
                 edgeTapZoneFraction = 0.3f   // 上部の左右 30% を端タップ領域にする
             )
+        }
+
+        item {
+            SectionTitle("2) Vertical picker")
+            Text(
+                text = "Selected: ${String.format(Locale.US, "%.1f", verticalValue)}",
+                modifier = Modifier.padding(horizontal = 20.dp),
+                style = MaterialTheme.typography.titleMedium
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(280.dp)
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                VerticalPicker(
+                    value = verticalValue,
+                    onValueChange = { verticalValue = it },
+                    valueRange = 0f..100f,
+                    step = 0.5f,
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(140.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                    tick = TickStyle(
+                        spacing = 10.dp,
+                        majorEvery = 20,
+                        mediumEvery = 10,
+                        majorHeight = 36.dp,
+                        mediumHeight = 26.dp,
+                        minorHeight = 16.dp
+                    ),
+                    label = LabelStyle(
+                        showEvery = 20,
+                        formatter = { value -> String.format(Locale.US, "%.0f", value) }
+                    ),
+                    centerMarker = CenterMarkerStyle(
+                        color = MaterialTheme.colorScheme.primary,
+                        stemHeight = 48.dp
+                    ),
+                    contentRotation = PickerContentRotation.Clockwise,
+                    edgeTapZoneFraction = 0.25f
+                )
+            }
         }
 
 //        SectionTitle("2) Float picker with labels")
