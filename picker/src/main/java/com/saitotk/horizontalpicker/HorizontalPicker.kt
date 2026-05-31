@@ -494,11 +494,13 @@ private fun Picker(
                 awaitEachGesture {
                     val down = awaitFirstPointerDown()
                     val mainAxisSize = orientation.mainAxisSize(size.width.toFloat(), size.height.toFloat())
+                    val crossAxisSize = orientation.crossAxisSize(size.width.toFloat(), size.height.toFloat())
                     val zoneSize = mainAxisSize * edgeTapZoneFraction
                     val delta = edgeTapStepDelta(
                         downPosition = down.position,
                         orientation = orientation,
                         mainAxisSize = mainAxisSize,
+                        crossAxisSize = crossAxisSize,
                         zoneSize = zoneSize,
                         overlayCrossAxisSize = edgeTapOverlayCrossAxisSizePx
                     )
@@ -853,6 +855,13 @@ internal enum class PickerOrientation(
             Vertical -> height
         }
     }
+
+    fun crossAxisSize(width: Float, height: Float): Float {
+        return when (this) {
+            Horizontal -> height
+            Vertical -> width
+        }
+    }
 }
 
 private fun Modifier.pickerSemantics(
@@ -1195,6 +1204,7 @@ internal fun edgeTapStepDelta(
     downPosition: Offset,
     orientation: PickerOrientation,
     mainAxisSize: Float,
+    crossAxisSize: Float,
     zoneSize: Float,
     overlayCrossAxisSize: Float
 ): Int {
@@ -1209,7 +1219,7 @@ internal fun edgeTapStepDelta(
             }
         }
         PickerOrientation.Vertical -> {
-            if (downPosition.x < mainAxisSize - overlayCrossAxisSize) return 0
+            if (downPosition.x < crossAxisSize - overlayCrossAxisSize) return 0
             when {
                 downPosition.y <= zoneSize -> -1
                 downPosition.y >= mainAxisSize - zoneSize -> 1

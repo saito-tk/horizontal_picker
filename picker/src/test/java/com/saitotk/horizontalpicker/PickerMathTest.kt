@@ -87,6 +87,7 @@ class PickerMathTest {
                 downPosition = Offset(x = 10f, y = 10f),
                 orientation = PickerOrientation.Horizontal,
                 mainAxisSize = 200f,
+                crossAxisSize = 60f,
                 zoneSize = 40f,
                 overlayCrossAxisSize = 30f
             )
@@ -97,6 +98,7 @@ class PickerMathTest {
                 downPosition = Offset(x = 190f, y = 10f),
                 orientation = PickerOrientation.Horizontal,
                 mainAxisSize = 200f,
+                crossAxisSize = 60f,
                 zoneSize = 40f,
                 overlayCrossAxisSize = 30f
             )
@@ -107,6 +109,7 @@ class PickerMathTest {
                 downPosition = Offset(x = 10f, y = 50f),
                 orientation = PickerOrientation.Horizontal,
                 mainAxisSize = 200f,
+                crossAxisSize = 60f,
                 zoneSize = 40f,
                 overlayCrossAxisSize = 30f
             )
@@ -121,6 +124,7 @@ class PickerMathTest {
                 downPosition = Offset(x = 190f, y = 10f),
                 orientation = PickerOrientation.Vertical,
                 mainAxisSize = 200f,
+                crossAxisSize = 200f,
                 zoneSize = 40f,
                 overlayCrossAxisSize = 30f
             )
@@ -131,6 +135,7 @@ class PickerMathTest {
                 downPosition = Offset(x = 190f, y = 190f),
                 orientation = PickerOrientation.Vertical,
                 mainAxisSize = 200f,
+                crossAxisSize = 200f,
                 zoneSize = 40f,
                 overlayCrossAxisSize = 30f
             )
@@ -141,7 +146,34 @@ class PickerMathTest {
                 downPosition = Offset(x = 150f, y = 10f),
                 orientation = PickerOrientation.Vertical,
                 mainAxisSize = 200f,
+                crossAxisSize = 200f,
                 zoneSize = 40f,
+                overlayCrossAxisSize = 30f
+            )
+        )
+    }
+
+    @Test
+    fun edgeTapStepDelta_usesWidthForVerticalCrossAxis() {
+        assertEquals(
+            -1,
+            edgeTapStepDelta(
+                downPosition = Offset(x = 50f, y = 10f),
+                orientation = PickerOrientation.Vertical,
+                mainAxisSize = 280f,
+                crossAxisSize = 56f,
+                zoneSize = 84f,
+                overlayCrossAxisSize = 30f
+            )
+        )
+        assertEquals(
+            0,
+            edgeTapStepDelta(
+                downPosition = Offset(x = 20f, y = 10f),
+                orientation = PickerOrientation.Vertical,
+                mainAxisSize = 280f,
+                crossAxisSize = 56f,
+                zoneSize = 84f,
                 overlayCrossAxisSize = 30f
             )
         )
