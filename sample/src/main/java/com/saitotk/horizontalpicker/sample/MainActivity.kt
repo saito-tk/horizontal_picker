@@ -61,7 +61,7 @@ private fun SampleScreen() {
     var integerValue by rememberSaveable { mutableIntStateOf(0) }
     var floatValue by rememberSaveable { mutableFloatStateOf(37.5f) }
     var customValue by rememberSaveable { mutableFloatStateOf(500f) }
-    var verticalValue by rememberSaveable { mutableFloatStateOf(50f) }
+    var verticalValue by rememberSaveable { mutableIntStateOf(0) }
 
     LazyColumn(
         modifier = Modifier
@@ -103,7 +103,7 @@ private fun SampleScreen() {
         item {
             SectionTitle("2) Vertical picker")
             Text(
-                text = "Selected: ${String.format(Locale.US, "%.1f", verticalValue)}",
+                text = "Selected: $verticalValue",
                 modifier = Modifier.padding(horizontal = 20.dp),
                 style = MaterialTheme.typography.titleMedium
             )
@@ -118,30 +118,18 @@ private fun SampleScreen() {
                 VerticalPicker(
                     value = verticalValue,
                     onValueChange = { verticalValue = it },
-                    valueRange = 0f..100f,
-                    step = 0.5f,
+                    range = 0..600,
+                    step = 1,
                     modifier = Modifier
                         .fillMaxHeight()
                         .width(140.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp),
-                    tick = TickStyle(
-                        spacing = 10.dp,
-                        majorEvery = 20,
-                        mediumEvery = 10,
-                        majorHeight = 36.dp,
-                        mediumHeight = 26.dp,
-                        minorHeight = 16.dp
-                    ),
-                    label = LabelStyle(
-                        showEvery = 20,
-                        formatter = { value -> String.format(Locale.US, "%.0f", value) }
-                    ),
+                    tick = TickStyle(majorEvery = 10, mediumEvery = 5),
+                    label = LabelStyle(showEvery = 10),
                     centerMarker = CenterMarkerStyle(
-                        color = MaterialTheme.colorScheme.primary,
-                        stemHeight = 48.dp
+                        color = MaterialTheme.colorScheme.error,
                     ),
                     contentRotation = PickerContentRotation.Clockwise,
-                    edgeTapZoneFraction = 0.25f
+                    edgeTapZoneFraction = 0.3f
                 )
             }
         }

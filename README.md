@@ -181,7 +181,7 @@ HorizontalPicker(
 - `flingBehavior`
   デフォルトは速度に応じた移動量を持つスナップ挙動です。独自の `FlingBehavior` を渡せます。
 - `edgeTapZoneFraction`
-  `0f` で無効です。`0.1f..0.5f` を指定すると、`HorizontalPicker` は上部の左右端、`VerticalPicker` は左側の上下端をタップしたときに 1 step 移動できます。
+  `0f` で無効です。`0.1f..0.5f` を指定すると、`HorizontalPicker` は上部の左右端、`VerticalPicker` は右側の上下端をタップしたときに 1 step 移動できます。
 - `enabled`
   `false` でスクロールと端タップを無効化します。
 

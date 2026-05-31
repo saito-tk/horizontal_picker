@@ -114,11 +114,11 @@ class PickerMathTest {
     }
 
     @Test
-    fun edgeTapStepDelta_detectsOnlyStartEdgeZonesForVerticalPicker() {
+    fun edgeTapStepDelta_detectsOnlyEndEdgeZonesForVerticalPicker() {
         assertEquals(
             -1,
             edgeTapStepDelta(
-                downPosition = Offset(x = 10f, y = 10f),
+                downPosition = Offset(x = 190f, y = 10f),
                 orientation = PickerOrientation.Vertical,
                 mainAxisSize = 200f,
                 zoneSize = 40f,
@@ -128,7 +128,7 @@ class PickerMathTest {
         assertEquals(
             1,
             edgeTapStepDelta(
-                downPosition = Offset(x = 10f, y = 190f),
+                downPosition = Offset(x = 190f, y = 190f),
                 orientation = PickerOrientation.Vertical,
                 mainAxisSize = 200f,
                 zoneSize = 40f,
@@ -138,7 +138,7 @@ class PickerMathTest {
         assertEquals(
             0,
             edgeTapStepDelta(
-                downPosition = Offset(x = 50f, y = 10f),
+                downPosition = Offset(x = 150f, y = 10f),
                 orientation = PickerOrientation.Vertical,
                 mainAxisSize = 200f,
                 zoneSize = 40f,
