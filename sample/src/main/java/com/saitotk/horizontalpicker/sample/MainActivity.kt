@@ -121,8 +121,7 @@ private fun SampleScreen() {
                     range = 0..600,
                     step = 1,
                     modifier = Modifier
-                        .fillMaxHeight()
-                        .width(140.dp),
+                        .fillMaxHeight(),
                     tick = TickStyle(majorEvery = 10, mediumEvery = 5),
                     label = LabelStyle(showEvery = 10),
                     centerMarker = CenterMarkerStyle(
