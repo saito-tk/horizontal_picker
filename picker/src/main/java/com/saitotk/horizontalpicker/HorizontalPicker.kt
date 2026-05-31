@@ -629,6 +629,7 @@ enum class PickerContentRotation(val degrees: Float) {
 }
 
 private val VerticalCenterMarkerContentEdgeOffset = 42.dp
+private val VerticalCenterMarkerLabelOverlap = 2.dp
 
 /** Default selection stem used by [HorizontalPicker]. */
 @Composable
@@ -733,7 +734,7 @@ fun BoxScope.DefaultVerticalValueBadge(
         },
         modifier = modifier
             .align(Alignment.CenterEnd)
-            .offset(x = VerticalCenterMarkerContentEdgeOffset)
+            .offset(x = VerticalCenterMarkerContentEdgeOffset - VerticalCenterMarkerLabelOverlap)
     ) { measurables, constraints ->
         val placeable = measurables.single().measure(
             constraints.copy(minWidth = 0, minHeight = 0)
