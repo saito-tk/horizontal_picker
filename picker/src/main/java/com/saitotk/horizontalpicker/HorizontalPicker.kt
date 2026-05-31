@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeightIn
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.requiredWidthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.progressSemantics
@@ -429,18 +430,37 @@ private fun Picker(
         PickerOrientation.Horizontal -> Modifier.fillMaxWidth()
         PickerOrientation.Vertical -> Modifier.fillMaxHeight()
     }
+    val crossAxisSizeModifier = when (orientation) {
+        PickerOrientation.Horizontal -> Modifier
+        PickerOrientation.Vertical -> Modifier.requiredWidth(
+            verticalPickerWidth(
+                tickStyle = tick,
+                labelStyle = label,
+                contentPadding = contentPadding,
+                layoutDirection = layoutDirection
+            )
+        )
+    }
     val trackModifier = when (orientation) {
         PickerOrientation.Horizontal -> Modifier
             .fillMaxWidth()
             .requiredHeightIn(min = trackHeight(tick, label, contentPadding))
         PickerOrientation.Vertical -> Modifier
             .fillMaxHeight()
-            .requiredWidthIn(min = trackWidth(tick, label, contentPadding, layoutDirection, contentRotation))
+            .requiredWidth(
+                verticalPickerWidth(
+                    tickStyle = tick,
+                    labelStyle = label,
+                    contentPadding = contentPadding,
+                    layoutDirection = layoutDirection
+                )
+            )
     }
 
     Box(
         modifier = modifier
             .then(axisFillModifier)
+            .then(crossAxisSizeModifier)
             .pickerSemantics(
                 enabled = enabled,
                 contentDescription = orientation.contentDescription,
@@ -511,7 +531,15 @@ private fun Picker(
             modifier = trackModifier
         )
 
-        Box(modifier = axisFillModifier) {
+        val markerOverlayModifier = when (orientation) {
+            PickerOrientation.Horizontal -> Modifier.fillMaxWidth()
+            PickerOrientation.Vertical -> Modifier
+                .fillMaxHeight()
+                .requiredWidth(centerMarker.stemHeight)
+                .align(Alignment.CenterEnd)
+        }
+
+        Box(modifier = markerOverlayModifier) {
             if (centerMarker.showValueBadge) {
                 valueBadge(selectedValueLabel, centerMarkerColor)
             }
@@ -628,7 +656,6 @@ enum class PickerContentRotation(val degrees: Float) {
     CounterClockwise(-90f)
 }
 
-private val VerticalCenterMarkerContentEdgeOffset = 42.dp
 private val VerticalCenterMarkerLabelOverlap = 2.dp
 
 /** Default selection stem used by [HorizontalPicker]. */
@@ -658,8 +685,7 @@ fun BoxScope.DefaultVerticalSelectionStem(
 ) {
     Box(
         modifier = modifier
-            .align(Alignment.CenterEnd)
-            .offset(x = VerticalCenterMarkerContentEdgeOffset)
+            .align(Alignment.CenterStart)
             .width(width)
             .height(height)
             .background(color, RoundedCornerShape(percent = 50))
@@ -734,7 +760,7 @@ fun BoxScope.DefaultVerticalValueBadge(
         },
         modifier = modifier
             .align(Alignment.CenterEnd)
-            .offset(x = VerticalCenterMarkerContentEdgeOffset - VerticalCenterMarkerLabelOverlap)
+            .offset(x = -VerticalCenterMarkerLabelOverlap)
     ) { measurables, constraints ->
         val placeable = measurables.single().measure(
             constraints.copy(minWidth = 0, minHeight = 0)
@@ -1006,21 +1032,13 @@ private fun trackHeight(
     return contentPadding.calculateTopPadding() + tickStyle.majorHeight + labelSpace + contentPadding.calculateBottomPadding()
 }
 
-private fun trackWidth(
+private fun verticalPickerWidth(
     tickStyle: TickStyle,
     labelStyle: LabelStyle,
     contentPadding: PaddingValues,
-    layoutDirection: androidx.compose.ui.unit.LayoutDirection,
-    contentRotation: PickerContentRotation
+    layoutDirection: androidx.compose.ui.unit.LayoutDirection
 ): Dp {
-    val labelCrossAxisSpace = if (!labelStyle.enabled) {
-        0.dp
-    } else if (contentRotation == PickerContentRotation.None) {
-        labelStyle.width
-    } else {
-        20.dp
-    }
-    val labelSpace = if (labelStyle.enabled) labelStyle.topPadding + labelCrossAxisSpace else 0.dp
+    val labelSpace = if (labelStyle.enabled) labelStyle.topPadding + 20.dp else 0.dp
     return contentPadding.calculateStartPadding(layoutDirection) +
         tickStyle.majorHeight +
         labelSpace +
