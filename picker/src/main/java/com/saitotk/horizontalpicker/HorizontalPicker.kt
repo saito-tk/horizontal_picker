@@ -630,7 +630,9 @@ enum class PickerContentRotation(val degrees: Float) {
     CounterClockwise(-90f)
 }
 
-private val VerticalCenterMarkerOffset = 40.dp
+private val VerticalCenterMarkerOffset = 48.dp
+private val VerticalCenterMarkerLineNudge = 6.dp
+private val VerticalCenterMarkerLabelNudge = 3.dp
 private val VerticalValueBadgeHalfWidth = 12.dp
 
 /** Default selection stem used by [HorizontalPicker]. */
@@ -661,7 +663,7 @@ fun BoxScope.DefaultVerticalSelectionStem(
     Box(
         modifier = modifier
             .align(Alignment.CenterEnd)
-            .offset(x = VerticalCenterMarkerOffset - VerticalValueBadgeHalfWidth)
+            .offset(x = VerticalCenterMarkerOffset + VerticalCenterMarkerLineNudge - VerticalValueBadgeHalfWidth)
             .width(width)
             .height(height)
             .background(color, RoundedCornerShape(percent = 50))
@@ -718,7 +720,7 @@ fun BoxScope.DefaultVerticalValueBadge(
     Box(
         modifier = modifier
             .align(Alignment.CenterEnd)
-            .offset(x = VerticalCenterMarkerOffset)
+            .offset(x = VerticalCenterMarkerOffset + VerticalCenterMarkerLabelNudge)
             .size(0.dp)
     ) {
         Text(
@@ -891,6 +893,7 @@ private fun PickerTrackCanvas(
                 labelHeightPx
             }
             val verticalTickStartX = startPaddingPx + verticalLabelCrossAxisSizePx + labelTopPaddingPx
+            val verticalTickEndX = verticalTickStartX + tickStyle.majorHeight.toPx()
             val verticalLabelStartX = startPaddingPx
 
             for (index in startIndex..endIndex) {
@@ -923,7 +926,7 @@ private fun PickerTrackCanvas(
                     PickerOrientation.Vertical -> drawRect(
                         color = tickColor,
                         topLeft = Offset(
-                            x = verticalTickStartX,
+                            x = verticalTickEndX - tickHeightPx,
                             y = positionOnMainAxis - thicknessPx / 2f
                         ),
                         size = Size(width = tickHeightPx, height = thicknessPx)
