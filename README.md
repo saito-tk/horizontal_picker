@@ -70,9 +70,18 @@ VerticalPicker(
 
 `VerticalPicker` の幅は、`HorizontalPicker` の高さと同じ仕様になるように内部で決まります。通常は sample と同じく高さだけを指定し、外側から `.width(...)` を指定する必要はありません。
 
-Activity を portrait のまま固定し、端末を横向きに持って見る用途では、縦向き picker のラベルとデフォルト値バッジだけを回転できます。
+Activity を portrait のまま固定し、端末を横向きに持って見る用途では、ラベルとデフォルト値バッジだけを回転できます。
 
 ```kotlin
+HorizontalPicker(
+    value = count,
+    onValueChange = { count = it },
+    range = 0..600,
+    step = 1,
+    modifier = Modifier.fillMaxWidth(),
+    contentRotation = PickerContentRotation.UpsideDown
+)
+
 VerticalPicker(
     value = count,
     onValueChange = { count = it },
@@ -82,6 +91,15 @@ VerticalPicker(
     contentRotation = PickerContentRotation.Clockwise
 )
 ```
+
+`contentRotation` は、端末の持ち方に合わせて文字の読み向きだけを変えるための設定です。picker 本体を回転させる設定ではありません。
+
+- `None`: 通常表示です。
+- `Clockwise`: ラベルとデフォルト値バッジを時計回りに 90 度回転します。
+- `CounterClockwise`: ラベルとデフォルト値バッジを反時計回りに 90 度回転します。
+- `UpsideDown`: ラベルとデフォルト値バッジを 180 度回転します。
+
+sample では、通常の `HorizontalPicker` / `VerticalPicker` に加えて、`HorizontalPicker` の `UpsideDown` 表示、`VerticalPicker` の `Clockwise` 表示、`VerticalPicker` の `CounterClockwise` 表示を確認できます。
 
 ## sample と同じ設定
 
@@ -120,7 +138,7 @@ VerticalPicker(
 
 `VerticalPicker` は縦方向をスクロール軸として扱い、目盛りは右揃えで左向きに描画します。目盛りの数字ラベルは目盛りの左側に表示され、デフォルトのセンターマーカーと現在値バッジは picker の右側に配置されます。現在値バッジは中央線の右側にあり、バッジ左端が中央線右端に少し重なる仕様です。
 
-`contentRotation` は `VerticalPicker` のラベルとデフォルト値バッジにだけ適用されます。ジェスチャー軸、fling、端タップ判定、目盛り描画は縦向き picker として処理されます。
+`contentRotation` はラベルとデフォルト値バッジにだけ適用されます。ジェスチャー軸、fling、端タップ判定、目盛り描画は各 picker の向きどおりに処理されます。
 
 ## カスタマイズ
 
@@ -225,7 +243,7 @@ HorizontalPicker(
 - `valueBadge`
   選択中の値バッジを差し替えます。引数は整形済み文字列とマーカー色です。
 - `contentRotation`
-  `VerticalPicker` のラベルとデフォルト値バッジの向きを指定します。Activity を portrait 固定のまま端末横向きで見る場合は `Clockwise` または `CounterClockwise` を指定します。
+  ラベルとデフォルト値バッジの向きを指定します。Activity を portrait 固定のまま端末横向きで見る場合は `Clockwise`、`CounterClockwise`、`UpsideDown` を指定します。
 - `haptics`
   `null` を渡すと haptic を無効化できます。
 - `flingBehavior`
@@ -261,8 +279,9 @@ fun HorizontalPicker(
     contentPadding: PaddingValues = PaddingValues(vertical = 12.dp),
     flingBehavior: FlingBehavior = PickerDefaults.SnapFlingBehavior,
     centerMarker: CenterMarkerStyle = CenterMarkerStyle(),
+    contentRotation: PickerContentRotation = PickerContentRotation.None,
     valueBadge: @Composable BoxScope.(valueText: String, color: Color) -> Unit = { valueText, color ->
-        DefaultValueBadge(valueText = valueText, color = color)
+        DefaultValueBadge(valueText = valueText, color = color, contentRotation = contentRotation)
     },
     tick: TickStyle = TickStyle(),
     label: LabelStyle = LabelStyle(),
@@ -281,8 +300,9 @@ fun HorizontalPicker(
     contentPadding: PaddingValues = PaddingValues(vertical = 12.dp),
     flingBehavior: FlingBehavior = PickerDefaults.SnapFlingBehavior,
     centerMarker: CenterMarkerStyle = CenterMarkerStyle(),
+    contentRotation: PickerContentRotation = PickerContentRotation.None,
     valueBadge: @Composable BoxScope.(valueText: String, color: Color) -> Unit = { valueText, color ->
-        DefaultValueBadge(valueText = valueText, color = color)
+        DefaultValueBadge(valueText = valueText, color = color, contentRotation = contentRotation)
     },
     tick: TickStyle = TickStyle(),
     label: LabelStyle = LabelStyle(formatter = { it.roundToInt().toString() }),
@@ -343,7 +363,8 @@ data class CenterMarkerStyle(
 enum class PickerContentRotation(val degrees: Float) {
     None(0f),
     Clockwise(90f),
-    CounterClockwise(-90f)
+    CounterClockwise(-90f),
+    UpsideDown(180f)
 }
 
 data class TickStyle(

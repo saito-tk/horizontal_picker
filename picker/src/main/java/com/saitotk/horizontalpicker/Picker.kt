@@ -96,8 +96,9 @@ fun HorizontalPicker(
     contentPadding: PaddingValues = PaddingValues(vertical = 12.dp),
     flingBehavior: FlingBehavior = PickerDefaults.SnapFlingBehavior,
     centerMarker: CenterMarkerStyle = CenterMarkerStyle(),
+    contentRotation: PickerContentRotation = PickerContentRotation.None,
     valueBadge: @Composable BoxScope.(valueText: String, color: Color) -> Unit = { valueText, color ->
-        DefaultValueBadge(valueText = valueText, color = color)
+        DefaultValueBadge(valueText = valueText, color = color, contentRotation = contentRotation)
     },
     tick: TickStyle = TickStyle(),
     label: LabelStyle = LabelStyle(),
@@ -115,7 +116,7 @@ fun HorizontalPicker(
         contentPadding = contentPadding,
         flingBehavior = flingBehavior,
         centerMarker = centerMarker,
-        contentRotation = PickerContentRotation.None,
+        contentRotation = contentRotation,
         valueBadge = valueBadge,
         tick = tick,
         label = label,
@@ -572,8 +573,9 @@ fun HorizontalPicker(
     contentPadding: PaddingValues = PaddingValues(vertical = 12.dp),
     flingBehavior: FlingBehavior = PickerDefaults.SnapFlingBehavior,
     centerMarker: CenterMarkerStyle = CenterMarkerStyle(),
+    contentRotation: PickerContentRotation = PickerContentRotation.None,
     valueBadge: @Composable BoxScope.(valueText: String, color: Color) -> Unit = { valueText, color ->
-        DefaultValueBadge(valueText = valueText, color = color)
+        DefaultValueBadge(valueText = valueText, color = color, contentRotation = contentRotation)
     },
     tick: TickStyle = TickStyle(),
     label: LabelStyle = LabelStyle(formatter = { it.roundToInt().toString() }),
@@ -592,6 +594,7 @@ fun HorizontalPicker(
         contentPadding = contentPadding,
         flingBehavior = flingBehavior,
         centerMarker = centerMarker,
+        contentRotation = contentRotation,
         valueBadge = valueBadge,
         tick = tick,
         label = label,
@@ -655,7 +658,8 @@ data class CenterMarkerStyle(
 enum class PickerContentRotation(val degrees: Float) {
     None(0f),
     Clockwise(90f),
-    CounterClockwise(-90f)
+    CounterClockwise(-90f),
+    UpsideDown(180f)
 }
 
 private val VerticalCenterMarkerLabelOverlap = 2.dp
@@ -711,26 +715,51 @@ fun BoxScope.DefaultCenterIndicator(
 fun BoxScope.DefaultValueBadge(
     valueText: String,
     color: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    contentRotation: PickerContentRotation = PickerContentRotation.None
 ) {
-    Text(
-        text = valueText,
+    Layout(
+        content = {
+            Text(
+                text = valueText,
+                modifier = Modifier
+                    .background(
+                        color = color,
+                        shape = RoundedCornerShape(
+                            topStart = 8.dp,
+                            topEnd = 8.dp,
+                            bottomStart = 8.dp,
+                            bottomEnd = 8.dp
+                        )
+                    )
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Clip
+            )
+        },
         modifier = modifier
             .align(Alignment.TopCenter)
             .offset(y = (-20).dp)
-            .background(
-                color = color,
-                shape = RoundedCornerShape(
-                    topStart = 8.dp,
-                    topEnd = 8.dp,
-                    bottomStart = 8.dp,
-                    bottomEnd = 8.dp
-                )
+    ) { measurables, constraints ->
+        val placeable = measurables.single().measure(
+            Constraints(
+                minWidth = 0,
+                maxWidth = Constraints.Infinity,
+                minHeight = 0,
+                maxHeight = constraints.maxHeight
             )
-            .padding(horizontal = 8.dp, vertical = 3.dp),
-        style = MaterialTheme.typography.labelMedium,
-        color = Color.White
-    )
+        )
+        layout(width = 0, height = 0) {
+            placeable.placeRelativeWithLayer(
+                x = (-placeable.width / 2f).roundToInt(),
+                y = 0
+            ) {
+                rotationZ = contentRotation.degrees
+            }
+        }
+    }
 }
 
 /** Default value badge used by [VerticalPicker]. */
@@ -995,13 +1024,29 @@ private fun PickerTrackCanvas(
                         constraints = Constraints(maxWidth = labelWidthPx)
                     )
                     when (orientation) {
-                        PickerOrientation.Horizontal -> drawText(
-                            textLayoutResult = textLayoutResult,
-                            topLeft = Offset(
-                                x = positionOnMainAxis - textLayoutResult.size.width / 2f,
-                                y = labelTopY + (labelHeightPx - textLayoutResult.size.height) / 2f
+                        PickerOrientation.Horizontal -> {
+                            val textCenter = Offset(
+                                x = positionOnMainAxis,
+                                y = labelTopY + labelHeightPx / 2f
                             )
-                        )
+                            val textTopLeft = Offset(
+                                x = textCenter.x - textLayoutResult.size.width / 2f,
+                                y = textCenter.y - textLayoutResult.size.height / 2f
+                            )
+                            if (contentRotation == PickerContentRotation.None) {
+                                drawText(
+                                    textLayoutResult = textLayoutResult,
+                                    topLeft = textTopLeft
+                                )
+                            } else {
+                                rotate(degrees = contentRotation.degrees, pivot = textCenter) {
+                                    drawText(
+                                        textLayoutResult = textLayoutResult,
+                                        topLeft = textTopLeft
+                                    )
+                                }
+                            }
+                        }
                         PickerOrientation.Vertical -> {
                             val textCenter = if (contentRotation == PickerContentRotation.None) {
                                 Offset(

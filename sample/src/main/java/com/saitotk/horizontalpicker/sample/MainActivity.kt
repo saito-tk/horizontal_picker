@@ -62,6 +62,8 @@ private fun SampleScreen() {
     var floatValue by rememberSaveable { mutableFloatStateOf(37.5f) }
     var customValue by rememberSaveable { mutableFloatStateOf(500f) }
     var verticalValue by rememberSaveable { mutableIntStateOf(0) }
+    var upsideDownValue by rememberSaveable { mutableIntStateOf(0) }
+    var counterClockwiseValue by rememberSaveable { mutableIntStateOf(0) }
 
     LazyColumn(
         modifier = Modifier
@@ -101,7 +103,30 @@ private fun SampleScreen() {
         }
 
         item {
-            SectionTitle("2) Vertical picker")
+            SectionTitle("2) Horizontal picker upside down")
+            Text(
+                text = "Selected: $upsideDownValue",
+                modifier = Modifier.padding(horizontal = 20.dp),
+                style = MaterialTheme.typography.titleMedium
+            )
+            HorizontalPicker(
+                value = upsideDownValue,
+                onValueChange = { upsideDownValue = it },
+                range = 0..600,
+                step = 1,
+                modifier = Modifier.fillMaxWidth(),
+                tick = TickStyle(majorEvery = 10, mediumEvery = 5),
+                label = LabelStyle(showEvery = 10),
+                centerMarker = CenterMarkerStyle(
+                    color = MaterialTheme.colorScheme.error,
+                ),
+                contentRotation = PickerContentRotation.UpsideDown,
+                edgeTapZoneFraction = 0.3f
+            )
+        }
+
+        item {
+            SectionTitle("3) Vertical picker clockwise")
             Text(
                 text = "Selected: $verticalValue",
                 modifier = Modifier.padding(horizontal = 20.dp),
@@ -128,6 +153,39 @@ private fun SampleScreen() {
                         color = MaterialTheme.colorScheme.error,
                     ),
                     contentRotation = PickerContentRotation.Clockwise,
+                    edgeTapZoneFraction = 0.3f
+                )
+            }
+        }
+
+        item {
+            SectionTitle("4) Vertical picker counter clockwise")
+            Text(
+                text = "Selected: $counterClockwiseValue",
+                modifier = Modifier.padding(horizontal = 20.dp),
+                style = MaterialTheme.typography.titleMedium
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(280.dp)
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                VerticalPicker(
+                    value = counterClockwiseValue,
+                    onValueChange = { counterClockwiseValue = it },
+                    range = 0..600,
+                    step = 1,
+                    modifier = Modifier
+                        .fillMaxHeight(),
+                    tick = TickStyle(majorEvery = 10, mediumEvery = 5),
+                    label = LabelStyle(showEvery = 10),
+                    centerMarker = CenterMarkerStyle(
+                        color = MaterialTheme.colorScheme.error,
+                    ),
+                    contentRotation = PickerContentRotation.CounterClockwise,
                     edgeTapZoneFraction = 0.3f
                 )
             }
