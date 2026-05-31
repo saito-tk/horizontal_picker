@@ -755,7 +755,9 @@ fun BoxScope.DefaultVerticalValueBadge(
                     )
                     .padding(horizontal = 8.dp, vertical = 3.dp),
                 style = MaterialTheme.typography.labelMedium,
-                color = Color.White
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Clip
             )
         },
         modifier = modifier
@@ -763,7 +765,12 @@ fun BoxScope.DefaultVerticalValueBadge(
             .offset(x = -VerticalCenterMarkerLabelOverlap)
     ) { measurables, constraints ->
         val placeable = measurables.single().measure(
-            constraints.copy(minWidth = 0, minHeight = 0)
+            Constraints(
+                minWidth = 0,
+                maxWidth = Constraints.Infinity,
+                minHeight = 0,
+                maxHeight = constraints.maxHeight
+            )
         )
         layout(width = 0, height = 0) {
             val x = if (contentRotation == PickerContentRotation.None) {
