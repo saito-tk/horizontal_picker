@@ -1,6 +1,6 @@
-# Horizontal Picker for Jetpack Compose
+# Horizontal / Vertical Picker for Jetpack Compose
 
-Jetpack Compose 向けの横スクロール式 Picker ライブラリです。中央の固定マーカーに目盛りを合わせて、`Float` または `Int` の値を選択できます。
+Jetpack Compose 向けの目盛り式 Picker ライブラリです。中央の固定マーカーに目盛りを合わせて、`Float` または `Int` の値を選択できます。横向きは `HorizontalPicker`、縦向きは `VerticalPicker` を使います。
 
 - Compose 専用
 - minSdk `21+`
@@ -26,57 +26,81 @@ dependencies {
 
 ## 基本の使い方
 
-### Float
+### HorizontalPicker / Float
 
 ```kotlin
 var temperature by rememberSaveable { mutableFloatStateOf(36.5f) }
 
 HorizontalPicker(
-    value = temperature,                 // 現在選択中の値
-    onValueChange = { temperature = it },  // 値変更時の反映先
-    valueRange = 35f..42f,               // 選択可能な範囲
-    step = 0.1f                          // 1 tick あたりの増減幅
+    value = temperature,
+    onValueChange = { temperature = it },
+    valueRange = 35f..42f,
+    step = 0.1f
 )
 ```
 
-### Int
+### HorizontalPicker / Int
 
 ```kotlin
-var age by rememberSaveable { mutableIntStateOf(30) }
+var count by rememberSaveable { mutableIntStateOf(0) }
 
 HorizontalPicker(
-    value = age,                 // 現在選択中の値
-    onValueChange = { age = it },  // 値変更時の反映先
-    range = 0..120,              // 選択可能な範囲
-    step = 1                     // 1 tick あたりの増減幅
+    value = count,
+    onValueChange = { count = it },
+    range = 0..600,
+    step = 1
 )
 ```
 
-### 縦向き表示
+### VerticalPicker
 
-`HorizontalPicker` を `Modifier.rotate(90f)` で回転させると、見た目とスクロール入力の座標軸がずれてフリングが安定しません。縦向きで表示したい場合は `VerticalPicker` を使ってください。
+`HorizontalPicker` を `Modifier.rotate(90f)` で回転させると、見た目とスクロール入力の座標軸がずれてフリングや端タップが安定しません。縦向きで表示したい場合は `VerticalPicker` を使います。
 
 ```kotlin
+var count by rememberSaveable { mutableIntStateOf(0) }
+
 VerticalPicker(
-    value = weight,
-    onValueChange = { weight = it },
-    valueRange = 0f..100f,
-    step = 0.5f,
-    modifier = Modifier
-        .fillMaxHeight()
-        .width(120.dp)
+    value = count,
+    onValueChange = { count = it },
+    range = 0..600,
+    step = 1,
+    modifier = Modifier.fillMaxHeight()
 )
 ```
 
-Activity を portrait のまま固定し、端末を横向きに持って見る用途では、ラベルとデフォルト値バッジだけを回転できます。
+`VerticalPicker` の幅は、`HorizontalPicker` の高さと同じ仕様になるように内部で決まります。通常は sample と同じく高さだけを指定し、外側から `.width(...)` を指定する必要はありません。
+
+Activity を portrait のまま固定し、端末を横向きに持って見る用途では、縦向き picker のラベルとデフォルト値バッジだけを回転できます。
 
 ```kotlin
 VerticalPicker(
-    value = weight,
-    onValueChange = { weight = it },
-    valueRange = 0f..100f,
-    step = 0.5f,
+    value = count,
+    onValueChange = { count = it },
+    range = 0..600,
+    step = 1,
+    modifier = Modifier.fillMaxHeight(),
     contentRotation = PickerContentRotation.Clockwise
+)
+```
+
+## sample と同じ設定
+
+sample の `VerticalPicker` は、`HorizontalPicker` と同じ範囲・step・目盛り・ラベル・センターマーカー・端タップ設定を使っています。
+
+```kotlin
+VerticalPicker(
+    value = verticalValue,
+    onValueChange = { verticalValue = it },
+    range = 0..600,
+    step = 1,
+    modifier = Modifier.fillMaxHeight(),
+    tick = TickStyle(majorEvery = 10, mediumEvery = 5),
+    label = LabelStyle(showEvery = 10),
+    centerMarker = CenterMarkerStyle(
+        color = MaterialTheme.colorScheme.error
+    ),
+    contentRotation = PickerContentRotation.Clockwise,
+    edgeTapZoneFraction = 0.3f
 )
 ```
 
@@ -89,6 +113,14 @@ VerticalPicker(
 - 外部 state の反映で発生するプログラム的なスクロール中は haptic を抑制します。
 - デフォルトでは速度に応じた移動量を持つスナップ付き fling を使います。
 - 描画は `Canvas` ベースで、可視範囲の tick と label だけを毎フレーム描画します。
+
+## HorizontalPicker と VerticalPicker の表示仕様
+
+`HorizontalPicker` は横方向をスクロール軸として扱い、目盛りは上揃えで下向きに描画します。ラベルは目盛りの下に表示され、デフォルトのセンターマーカーと値バッジは上中央に配置されます。
+
+`VerticalPicker` は縦方向をスクロール軸として扱い、目盛りは右揃えで左向きに描画します。目盛りの数字ラベルは目盛りの左側に表示され、デフォルトのセンターマーカーと現在値バッジは picker の右側に配置されます。現在値バッジは中央線の右側にあり、バッジ左端が中央線右端に少し重なる仕様です。
+
+`contentRotation` は `VerticalPicker` のラベルとデフォルト値バッジにだけ適用されます。ジェスチャー軸、fling、端タップ判定、目盛り描画は縦向き picker として処理されます。
 
 ## カスタマイズ
 
@@ -103,17 +135,18 @@ HorizontalPicker(
     valueRange = 0f..1000f,
     step = 5f,
     tick = TickStyle(
-        spacing = 10.dp,      // 各目盛りの横間隔
+        spacing = 10.dp,      // 各目盛りの間隔
+        thickness = 2.dp,     // 目盛り線の太さ
         majorEvery = 10,      // 10 tick ごとに大目盛り
         mediumEvery = 5,      // 5 tick ごとに中目盛り
-        majorHeight = 16.dp,  // 大目盛りの高さ
-        mediumHeight = 8.dp,  // 中目盛りの高さ
-        minorHeight = 4.dp    // 小目盛りの高さ
+        majorHeight = 16.dp,  // 大目盛りの長さ
+        mediumHeight = 8.dp,  // 中目盛りの長さ
+        minorHeight = 4.dp    // 小目盛りの長さ
     ),
     label = LabelStyle(
-        showEvery = 10,                     // 10 tick ごとにラベル表示
-        width = 64.dp,                      // ラベルの描画幅
-        formatter = { "${it.toInt()} 円" }  // ラベル文字列の変換
+        showEvery = 10,
+        width = 64.dp,
+        formatter = { "${it.toInt()} 円" }
     )
 )
 ```
@@ -127,15 +160,34 @@ HorizontalPicker(
     valueRange = 0f..100f,
     step = 1f,
     centerMarker = CenterMarkerStyle(
-        color = MaterialTheme.colorScheme.error,  // 中央マーカーの色
-        stemWidth = 2.dp,                         // 中央マーカーの幅
-        stemHeight = 32.dp,                       // 中央マーカーの高さ
-        showValueBadge = true                     // デフォルト値バッジを表示
+        color = MaterialTheme.colorScheme.error,
+        stemWidth = 2.dp,
+        stemHeight = 32.dp,
+        showValueBadge = true
     ),
     valueBadge = { valueText, color ->
         DefaultValueBadge(
-            valueText = "$valueText kg",  // 表示文字列を差し替え
-            color = color                 // マーカー色をそのまま利用
+            valueText = "$valueText kg",
+            color = color
+        )
+    }
+)
+```
+
+`VerticalPicker` で値バッジを差し替える場合は、必要に応じて `DefaultVerticalValueBadge` を使います。
+
+```kotlin
+VerticalPicker(
+    value = count,
+    onValueChange = { count = it },
+    range = 0..600,
+    step = 1,
+    contentRotation = PickerContentRotation.Clockwise,
+    valueBadge = { valueText, color ->
+        DefaultVerticalValueBadge(
+            valueText = valueText,
+            color = color,
+            contentRotation = PickerContentRotation.Clockwise
         )
     }
 )
@@ -149,27 +201,25 @@ HorizontalPicker(
     onValueChange = { count = it },
     range = 0..600,
     step = 1,
-    edgeTapZoneFraction = 0.3f  // 左右それぞれ 30% を端タップ領域にする
+    edgeTapZoneFraction = 0.3f
 )
 ```
 
-`edgeTapZoneFraction = 0f` のときは無効です。`0.1f..0.5f` を指定すると、マーカー上部の左右端をタップしたときに 1 step ずつ移動できます。
+`edgeTapZoneFraction = 0f` のときは無効です。`0.1f..0.5f` を指定すると、端タップで 1 step ずつ移動できます。
 
-`edgeTapZoneFraction` は、コンポーネント全体の幅に対して左右それぞれ何割を端タップ領域にするかを表します。
-`VerticalPicker` では高さに対する上下端の割合として扱われます。
-
-- `0.1f` なら左 10% と右 10%
-- `0.3f` なら左 30% と右 30%
-- 判定されるのはマーカー上部のオーバーレイ領域内だけです
-- ドラッグに入った場合は端タップとして扱われません
-- 現状、端タップの長押しオートリピートはありません
+- `HorizontalPicker` は上部オーバーレイの左右端を判定します。
+- `VerticalPicker` は右側オーバーレイの上下端を判定します。
+- `edgeTapZoneFraction` は、横向きでは幅、縦向きでは高さに対する端領域の割合です。
+- `0.3f` なら左右または上下それぞれ 30% が端タップ領域です。
+- ドラッグに入った場合は端タップとして扱われません。
+- 現状、端タップの長押しオートリピートはありません。
 
 ## 主な引数
 
 - `tick: TickStyle`
-  目盛りの間隔、高さ、太さ、色、`mediumEvery`、`majorEvery` を指定します。`mediumEvery <= 0` または `majorEvery <= 0` にすると、その種別の目盛りは出ません。
+  目盛りの間隔、太さ、長さ、色、`mediumEvery`、`majorEvery` を指定します。`mediumEvery <= 0` または `majorEvery <= 0` にすると、その種別の目盛りは出ません。
 - `label: LabelStyle`
-  ラベルの有無、表示間隔、幅、文字色、フォーマッタを指定します。`enabled = false` または `showEvery <= 0` でラベルを非表示にできます。
+  ラベルの有無、表示間隔、余白、幅、文字色、フォーマッタを指定します。`enabled = false` または `showEvery <= 0` でラベルを非表示にできます。
 - `centerMarker: CenterMarkerStyle`
   中央マーカーの色、幅、高さ、値バッジ表示を指定します。
 - `valueBadge`
@@ -198,6 +248,8 @@ HorizontalPicker(
 
 ## 公開 API
 
+主な公開APIは `picker/src/main/java/com/saitotk/horizontalpicker/Picker.kt` にあります。ライブラリ名と package は `horizontalpicker` のままですが、利用側は用途に応じて `HorizontalPicker` または `VerticalPicker` を呼び分けます。
+
 ```kotlin
 @Composable
 fun HorizontalPicker(
@@ -281,9 +333,39 @@ fun VerticalPicker(
     enabled: Boolean = true
 )
 
-enum class PickerContentRotation {
-    None,
-    Clockwise,
-    CounterClockwise
+data class CenterMarkerStyle(
+    val color: Color = Color.Unspecified,
+    val stemWidth: Dp = 4.dp,
+    val stemHeight: Dp = 26.dp,
+    val showValueBadge: Boolean = true
+)
+
+enum class PickerContentRotation(val degrees: Float) {
+    None(0f),
+    Clockwise(90f),
+    CounterClockwise(-90f)
 }
+
+data class TickStyle(
+    val spacing: Dp = 12.dp,
+    val thickness: Dp = 2.dp,
+    val minorHeight: Dp = 4.dp,
+    val mediumHeight: Dp = 8.dp,
+    val majorHeight: Dp = 16.dp,
+    val minorColor: Color = Color.Unspecified,
+    val mediumColor: Color = Color.Unspecified,
+    val majorColor: Color = Color.Unspecified,
+    val mediumEvery: Int = 5,
+    val majorEvery: Int = 10
+)
+
+data class LabelStyle(
+    val enabled: Boolean = true,
+    val showEvery: Int = 10,
+    val topPadding: Dp = 8.dp,
+    val width: Dp = 48.dp,
+    val textStyle: TextStyle = TextStyle.Default,
+    val color: Color = Color.Unspecified,
+    val formatter: (Float) -> String = { ... }
+)
 ```
