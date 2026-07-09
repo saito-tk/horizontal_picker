@@ -741,7 +741,7 @@ fun BoxScope.DefaultValueBadge(
                     )
                     .padding(horizontal = 8.dp, vertical = 3.dp),
                 style = MaterialTheme.typography.labelMedium,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Clip
             )
@@ -793,7 +793,7 @@ fun BoxScope.DefaultVerticalValueBadge(
                     )
                     .padding(horizontal = 8.dp, vertical = 3.dp),
                 style = MaterialTheme.typography.labelMedium,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Clip
             )
