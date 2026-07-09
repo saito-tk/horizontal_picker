@@ -315,7 +315,7 @@ private fun Picker(
         animateToIndex(targetIndex, markProgrammatic = true)
     }
 
-    LaunchedEffect(scrollableState, enabled, haptics, isProgrammaticScroll, stepPx) {
+    LaunchedEffect(scrollableState, enabled, haptics, stepPx) {
         var previousCenteredIndexFloat: Float? = null
 
         snapshotFlow {
