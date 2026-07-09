@@ -389,8 +389,9 @@ private fun Picker(
     val semanticsLabel = remember(reportedValue, actionLabelFormatter) {
         actionLabelFormatter(reportedValue)
     }
-    val selectedValueLabel = remember(reportedValue, step) {
-        formatSelectedValueForBadge(reportedValue, step)
+    val badgeDecimalPlaces = remember(step) { stepDecimalPlaces(step) }
+    val selectedValueLabel = remember(reportedValue, badgeDecimalPlaces) {
+        formatSelectedValueForBadge(reportedValue, badgeDecimalPlaces)
     }
     val centerMarkerColor = centerMarker.color.orFallback(MaterialTheme.colorScheme.primary)
     val layoutDirection = LocalLayoutDirection.current
@@ -1281,8 +1282,7 @@ internal fun edgeTapStepDelta(
     }
 }
 
-private fun formatSelectedValueForBadge(value: Float, step: Float): String {
-    val decimals = stepDecimalPlaces(step)
+private fun formatSelectedValueForBadge(value: Float, decimals: Int): String {
     return if (decimals == 0) {
         value.roundToInt().toString()
     } else {
