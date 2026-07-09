@@ -58,6 +58,7 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
@@ -414,6 +415,12 @@ private fun Picker(
             lineHeightSp.toDp().coerceAtLeast(20.dp)
         }
     }
+    val orientationContentDescription = when (orientation) {
+        PickerOrientation.Horizontal -> stringResource(R.string.horizontal_picker_content_description)
+        PickerOrientation.Vertical -> stringResource(R.string.vertical_picker_content_description)
+    }
+    val increaseActionLabel = stringResource(R.string.picker_action_increase)
+    val decreaseActionLabel = stringResource(R.string.picker_action_decrease)
     val contentAlpha = if (enabled) 1f else 0.38f
     val edgeTapOverlayCrossAxisSize = when (orientation) {
         PickerOrientation.Horizontal -> maxOf(
@@ -487,10 +494,12 @@ private fun Picker(
             .then(crossAxisSizeModifier)
             .pickerSemantics(
                 enabled = enabled,
-                contentDescription = orientation.contentDescription,
+                contentDescription = orientationContentDescription,
                 valueLabel = semanticsLabel,
                 currentIndex = selectedIndex,
                 maxIndex = model.lastIndex,
+                increaseLabel = increaseActionLabel,
+                decreaseLabel = decreaseActionLabel,
                 onIncrease = {
                     scope.launch { stopAndSnapToIndex((selectedIndex + 1).coerceAtMost(model.lastIndex)) }
                 },
@@ -896,11 +905,10 @@ private enum class TickType {
 }
 
 internal enum class PickerOrientation(
-    val scrollableOrientation: Orientation,
-    val contentDescription: String
+    val scrollableOrientation: Orientation
 ) {
-    Horizontal(Orientation.Horizontal, "Horizontal picker"),
-    Vertical(Orientation.Vertical, "Vertical picker");
+    Horizontal(Orientation.Horizontal),
+    Vertical(Orientation.Vertical);
 
     fun mainAxisSize(width: Float, height: Float): Float {
         return when (this) {
@@ -923,6 +931,8 @@ private fun Modifier.pickerSemantics(
     valueLabel: String,
     currentIndex: Int,
     maxIndex: Int,
+    increaseLabel: String,
+    decreaseLabel: String,
     onIncrease: () -> Unit,
     onDecrease: () -> Unit
 ): Modifier {
@@ -936,7 +946,7 @@ private fun Modifier.pickerSemantics(
 
             customActions = listOfNotNull(
                 if (canIncrease) {
-                    CustomAccessibilityAction(label = "Increase") {
+                    CustomAccessibilityAction(label = increaseLabel) {
                         onIncrease()
                         true
                     }
@@ -944,7 +954,7 @@ private fun Modifier.pickerSemantics(
                     null
                 },
                 if (canDecrease) {
-                    CustomAccessibilityAction(label = "Decrease") {
+                    CustomAccessibilityAction(label = decreaseLabel) {
                         onDecrease()
                         true
                     }
