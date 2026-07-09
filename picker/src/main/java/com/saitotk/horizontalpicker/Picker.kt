@@ -63,6 +63,7 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
@@ -505,6 +506,9 @@ private fun Picker(
                 },
                 onDecrease = {
                     scope.launch { stopAndSnapToIndex((selectedIndex - 1).coerceAtLeast(0)) }
+                },
+                onSetValue = { targetValue ->
+                    scope.launch { stopAndSnapToIndex(model.valueToIndex(targetValue)) }
                 }
             )
             .progressSemantics(
@@ -934,7 +938,8 @@ private fun Modifier.pickerSemantics(
     increaseLabel: String,
     decreaseLabel: String,
     onIncrease: () -> Unit,
-    onDecrease: () -> Unit
+    onDecrease: () -> Unit,
+    onSetValue: (Float) -> Unit
 ): Modifier {
     return semantics(mergeDescendants = true) {
         this.contentDescription = contentDescription
@@ -962,6 +967,11 @@ private fun Modifier.pickerSemantics(
                     null
                 }
             )
+
+            setProgress { targetValue ->
+                onSetValue(targetValue)
+                true
+            }
         }
     }
 }
