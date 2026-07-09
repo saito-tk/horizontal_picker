@@ -232,7 +232,7 @@ private fun Picker(
         flingBehavior
     }
 
-    val selectedIndex by remember(currentIndexFloat, model) {
+    val selectedIndex by remember(model) {
         derivedStateOf {
             currentIndexFloat.roundToInt().coerceIn(0, model.lastIndex)
         }
