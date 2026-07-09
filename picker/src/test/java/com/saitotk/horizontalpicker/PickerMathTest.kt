@@ -172,6 +172,36 @@ class PickerMathTest {
     }
 
     @Test
+    fun edgeTapIndicatorPositions_horizontal_centersWithinZoneAndOverlayBand() {
+        val positions = edgeTapIndicatorPositions(
+            orientation = PickerOrientation.Horizontal,
+            mainAxisSize = 300f,
+            crossAxisSize = 80f,
+            zoneSize = 60f,
+            overlayCrossAxisSize = 40f
+        )
+
+        assertEquals(Offset(30f, 20f), positions.start)
+        assertEquals(Offset(270f, 20f), positions.end)
+    }
+
+    @Test
+    fun edgeTapIndicatorPositions_vertical_alignsWithEndSideOverlayBand() {
+        val positions = edgeTapIndicatorPositions(
+            orientation = PickerOrientation.Vertical,
+            mainAxisSize = 300f,
+            crossAxisSize = 80f,
+            zoneSize = 60f,
+            overlayCrossAxisSize = 40f
+        )
+
+        // The vertical picker's overlay band sits against the end (right) edge of the cross
+        // axis, not the start, matching where the marker/badge are actually drawn.
+        assertEquals(Offset(60f, 30f), positions.start)
+        assertEquals(Offset(60f, 270f), positions.end)
+    }
+
+    @Test
     fun edgeTapStepDelta_usesWidthForVerticalCrossAxis() {
         assertEquals(
             -1,

@@ -50,6 +50,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -112,6 +117,7 @@ fun HorizontalPicker(
     label: LabelStyle = LabelStyle(),
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
     edgeTapZoneFraction: Float = 0f,
+    edgeTapIndicator: EdgeTapIndicatorStyle = EdgeTapIndicatorStyle(),
     enabled: Boolean = true
 ) {
     Picker(
@@ -130,6 +136,7 @@ fun HorizontalPicker(
         label = label,
         haptics = haptics,
         edgeTapZoneFraction = edgeTapZoneFraction,
+        edgeTapIndicator = edgeTapIndicator,
         enabled = enabled
     )
 }
@@ -158,6 +165,7 @@ fun VerticalPicker(
     label: LabelStyle = LabelStyle(),
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
     edgeTapZoneFraction: Float = 0f,
+    edgeTapIndicator: EdgeTapIndicatorStyle = EdgeTapIndicatorStyle(),
     enabled: Boolean = true
 ) {
     Picker(
@@ -176,6 +184,7 @@ fun VerticalPicker(
         label = label,
         haptics = haptics,
         edgeTapZoneFraction = edgeTapZoneFraction,
+        edgeTapIndicator = edgeTapIndicator,
         enabled = enabled
     )
 }
@@ -197,6 +206,7 @@ private fun Picker(
     label: LabelStyle,
     haptics: HapticFeedbackType?,
     edgeTapZoneFraction: Float,
+    edgeTapIndicator: EdgeTapIndicatorStyle,
     enabled: Boolean
 ) {
     require(edgeTapZoneFraction == 0f || edgeTapZoneFraction in 0.1f..0.5f) {
@@ -601,6 +611,44 @@ private fun Picker(
                 )
             }
         }
+
+        if (edgeTapStepEnabled && enabled && edgeTapIndicator.visible) {
+            val edgeTapIndicatorColor = edgeTapIndicator.color.orFallback(MaterialTheme.colorScheme.onSurfaceVariant)
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .drawBehind {
+                        val mainAxisSize = orientation.mainAxisSize(size.width, size.height)
+                        val crossAxisSize = orientation.crossAxisSize(size.width, size.height)
+                        val zoneSize = mainAxisSize * edgeTapZoneFraction
+                        val positions = edgeTapIndicatorPositions(
+                            orientation = orientation,
+                            mainAxisSize = mainAxisSize,
+                            crossAxisSize = crossAxisSize,
+                            zoneSize = zoneSize,
+                            overlayCrossAxisSize = edgeTapOverlayCrossAxisSizePx
+                        )
+                        val halfExtentPx = edgeTapIndicator.size.toPx() / 2f
+                        val strokeWidthPx = edgeTapIndicator.strokeWidth.toPx()
+                        drawEdgeTapChevron(
+                            center = positions.start,
+                            halfExtent = halfExtentPx,
+                            color = edgeTapIndicatorColor,
+                            strokeWidthPx = strokeWidthPx,
+                            orientation = orientation,
+                            pointsTowardStart = true
+                        )
+                        drawEdgeTapChevron(
+                            center = positions.end,
+                            halfExtent = halfExtentPx,
+                            color = edgeTapIndicatorColor,
+                            strokeWidthPx = strokeWidthPx,
+                            orientation = orientation,
+                            pointsTowardStart = false
+                        )
+                    }
+            )
+        }
     }
 }
 
@@ -623,6 +671,7 @@ fun HorizontalPicker(
     label: LabelStyle = LabelStyle(formatter = { it.roundToInt().toString() }),
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
     edgeTapZoneFraction: Float = 0f,
+    edgeTapIndicator: EdgeTapIndicatorStyle = EdgeTapIndicatorStyle(),
     enabled: Boolean = true
 ) {
     require(step > 0) { "step must be > 0" }
@@ -642,6 +691,7 @@ fun HorizontalPicker(
         label = label,
         haptics = haptics,
         edgeTapZoneFraction = edgeTapZoneFraction,
+        edgeTapIndicator = edgeTapIndicator,
         enabled = enabled
     )
 }
@@ -665,6 +715,7 @@ fun VerticalPicker(
     label: LabelStyle = LabelStyle(formatter = { it.roundToInt().toString() }),
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
     edgeTapZoneFraction: Float = 0f,
+    edgeTapIndicator: EdgeTapIndicatorStyle = EdgeTapIndicatorStyle(),
     enabled: Boolean = true
 ) {
     require(step > 0) { "step must be > 0" }
@@ -684,6 +735,7 @@ fun VerticalPicker(
         label = label,
         haptics = haptics,
         edgeTapZoneFraction = edgeTapZoneFraction,
+        edgeTapIndicator = edgeTapIndicator,
         enabled = enabled
     )
 }
@@ -694,6 +746,21 @@ data class CenterMarkerStyle(
     val stemWidth: Dp = 4.dp,
     val stemHeight: Dp = 26.dp,
     val showValueBadge: Boolean = true
+)
+
+/**
+ * Visual affordance drawn at the tappable edges when [HorizontalPicker]'s or [VerticalPicker]'s
+ * `edgeTapZoneFraction` is enabled, so the step-by-one zones are discoverable instead of hidden.
+ *
+ * Hidden by default ([visible] = false): existing call sites that don't set this render
+ * byte-for-byte the same as before this style existed.
+ */
+@Immutable
+data class EdgeTapIndicatorStyle(
+    val visible: Boolean = false,
+    val color: Color = Color.Unspecified,
+    val size: Dp = 10.dp,
+    val strokeWidth: Dp = 2.dp
 )
 
 /** Rotation applied to labels and the default vertical value badge. */
@@ -1230,6 +1297,43 @@ private fun rememberPickerSnapFlingBehavior(
 
 private fun Color.orFallback(fallback: Color): Color {
     return if (this == Color.Unspecified) fallback else this
+}
+
+/**
+ * Draws a single chevron ("‹"/"›" for [PickerOrientation.Horizontal], "^"/"v" for
+ * [PickerOrientation.Vertical]) pointing toward the nearer edge, matching the direction
+ * [edgeTapStepDelta] actually steps in when that edge is tapped.
+ */
+private fun DrawScope.drawEdgeTapChevron(
+    center: Offset,
+    halfExtent: Float,
+    color: Color,
+    strokeWidthPx: Float,
+    orientation: PickerOrientation,
+    pointsTowardStart: Boolean
+) {
+    val path = Path()
+    when (orientation) {
+        PickerOrientation.Horizontal -> {
+            val tipX = if (pointsTowardStart) center.x - halfExtent else center.x + halfExtent
+            val baseX = if (pointsTowardStart) center.x + halfExtent else center.x - halfExtent
+            path.moveTo(baseX, center.y - halfExtent)
+            path.lineTo(tipX, center.y)
+            path.lineTo(baseX, center.y + halfExtent)
+        }
+        PickerOrientation.Vertical -> {
+            val tipY = if (pointsTowardStart) center.y - halfExtent else center.y + halfExtent
+            val baseY = if (pointsTowardStart) center.y + halfExtent else center.y - halfExtent
+            path.moveTo(center.x - halfExtent, baseY)
+            path.lineTo(center.x, tipY)
+            path.lineTo(center.x + halfExtent, baseY)
+        }
+    }
+    drawPath(
+        path = path,
+        color = color,
+        style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round, join = StrokeJoin.Round)
+    )
 }
 
 private inline fun forEachCrossedAlignedIndex(
