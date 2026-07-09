@@ -89,6 +89,9 @@ import kotlin.math.roundToInt
  *
  * The picker maps one tick to one discrete value step. When scrolling stops, it snaps to the
  * nearest tick and reports a canonical stepped value through [onValueChange].
+ *
+ * Note: tick/label drawing and the [edgeTapZoneFraction] hit zones use absolute (not
+ * layout-direction-aware) coordinates, so the picker does not mirror in RTL layouts.
  */
 @Composable
 fun HorizontalPicker(
