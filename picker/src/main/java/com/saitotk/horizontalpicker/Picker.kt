@@ -975,6 +975,12 @@ private fun PickerTrackCanvas(
             val verticalTickStartX = startPaddingPx + verticalLabelCrossAxisSizePx + labelTopPaddingPx
             val verticalTickEndX = verticalTickStartX + tickStyle.majorHeight.toPx()
             val verticalLabelStartX = startPaddingPx
+            val minorTickColor = tickStyle.minorColor.orFallback(colorScheme.outlineVariant)
+            val mediumTickColor = tickStyle.mediumColor.orFallback(colorScheme.outline)
+            val majorTickColor = tickStyle.majorColor.orFallback(colorScheme.onSurface)
+            val minorTickHeightPx = tickStyle.minorHeight.toPx()
+            val mediumTickHeightPx = tickStyle.mediumHeight.toPx()
+            val majorTickHeightPx = tickStyle.majorHeight.toPx()
 
             for (index in startIndex..endIndex) {
                 val tickType = when {
@@ -983,14 +989,14 @@ private fun PickerTrackCanvas(
                     else -> TickType.Minor
                 }
                 val tickColor = when (tickType) {
-                    TickType.Minor -> tickStyle.minorColor.orFallback(colorScheme.outlineVariant)
-                    TickType.Medium -> tickStyle.mediumColor.orFallback(colorScheme.outline)
-                    TickType.Major -> tickStyle.majorColor.orFallback(colorScheme.onSurface)
+                    TickType.Minor -> minorTickColor
+                    TickType.Medium -> mediumTickColor
+                    TickType.Major -> majorTickColor
                 }
                 val tickHeightPx = when (tickType) {
-                    TickType.Minor -> tickStyle.minorHeight.toPx()
-                    TickType.Medium -> tickStyle.mediumHeight.toPx()
-                    TickType.Major -> tickStyle.majorHeight.toPx()
+                    TickType.Minor -> minorTickHeightPx
+                    TickType.Medium -> mediumTickHeightPx
+                    TickType.Major -> majorTickHeightPx
                 }
                 val positionOnMainAxis = centerOnMainAxis + (index - currentIndex) * spacingPx
 
