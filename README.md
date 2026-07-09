@@ -5,8 +5,9 @@ Jetpack Compose 向けの目盛り式 Picker ライブラリです。中央の�
 - Compose 専用
 - minSdk `21+`
 - 横向き/縦向きの `Float` / `Int` API を提供
-- スナップ、haptic、アクセシビリティ、RTL に対応
+- スナップ、haptic、アクセシビリティ(TalkBack のカスタムアクション/Adjustable ジェスチャー、無効状態通知)、日本語ローカライズ済み文字列に対応
 - `Canvas + scrollable` ベースの軽量描画実装
+- RTL レイアウトのミラーリングは未対応です(詳細は下記「制約と注意点」参照)
 
 ## デモ
 
@@ -126,11 +127,16 @@ VerticalPicker(
 
 - 1 tick = 1 step の線形 picker です。
 - `value` はレンジ内に clamp され、最も近い step に snap されます。
-- `onValueChange` は、中央線が目盛り中心を通過したタイミングで呼ばれます。
-- 高速フリング時も、通過した step を補間して値更新と haptic を行います。
+- `onValueChange` は、中央線が目盛り中心を通過したタイミングで呼ばれます。高速フリング時も、通過した step をすべて補間して値更新します。
+- haptic は通過した step ごとに鳴りますが、1 フレームで複数 step を跨ぐ高速フリング中は 1 フレームにつき最大 1 回に間引かれます(値の更新自体は間引かれません)。
 - 外部 state の反映で発生するプログラム的なスクロール中は haptic を抑制します。
 - デフォルトでは速度に応じた移動量を持つスナップ付き fling を使います。
 - 描画は `Canvas` ベースで、可視範囲の tick と label だけを毎フレーム描画します。
+- `enabled = false` のとき、tick・ラベル・値バッジ・センターマーカーを半透明(alpha 0.38)で減光し、アクセシビリティサービスにも無効状態として通知します(TalkBack はこの picker を操作不可として読み上げます)。
+- TalkBack など画面読み上げサービスの上下/左右スワイプ(Adjustable の標準ジェスチャー)でも値を変更できます。カスタムアクションの「増やす」「減らす」と併用できます。
+- ラベルとデフォルト値バッジに使う領域は、システムのフォントサイズ設定(フォントスケール)に応じて拡大します。標準設定では従来と全く同じレイアウトです。
+- コンテンツ説明・アクセシビリティアクション名は `strings.xml` 経由で提供され、`values-ja` で日本語に対応しています。
+- tick/label の描画と `edgeTapZoneFraction` のタップ判定は絶対座標で処理されるため、RTL レイアウトでもミラーリングされません。
 
 ## HorizontalPicker と VerticalPicker の表示仕様
 
@@ -232,6 +238,26 @@ HorizontalPicker(
 - ドラッグに入った場合は端タップとして扱われません。
 - 現状、端タップの長押しオートリピートはありません。
 
+端タップ領域はデフォルトでは見た目に何も表示されないため、存在に気づかれにくいという難点があります。`edgeTapIndicator` にスタイルを渡すと、判定領域と同じ位置・同じ範囲にシェブロン(`‹` `›` / `^` `v`)を表示できます。
+
+```kotlin
+HorizontalPicker(
+    value = count,
+    onValueChange = { count = it },
+    range = 0..600,
+    step = 1,
+    edgeTapZoneFraction = 0.3f,
+    edgeTapIndicator = EdgeTapIndicatorStyle(
+        visible = true,
+        color = MaterialTheme.colorScheme.outline,
+        size = 10.dp,
+        strokeWidth = 2.dp
+    )
+)
+```
+
+`edgeTapIndicator` を指定しない場合(デフォルトの `EdgeTapIndicatorStyle()`)は `visible = false` のため何も描画されず、既存コードの見た目・挙動は変わりません。
+
 ## 主な引数
 
 - `tick: TickStyle`
@@ -250,8 +276,10 @@ HorizontalPicker(
   デフォルトは速度に応じた移動量を持つスナップ挙動です。独自の `FlingBehavior` を渡せます。
 - `edgeTapZoneFraction`
   `0f` で無効です。`0.1f..0.5f` を指定すると、`HorizontalPicker` は上部の左右端、`VerticalPicker` は右側の上下端をタップしたときに 1 step 移動できます。
+- `edgeTapIndicator: EdgeTapIndicatorStyle`
+  端タップ領域にシェブロンを表示するかどうか、色、大きさ、線幅を指定します。デフォルトは `visible = false`(非表示)です。
 - `enabled`
-  `false` でスクロールと端タップを無効化します。
+  `false` でスクロールと端タップを無効化し、見た目を半透明(alpha 0.38)にして、アクセシビリティサービスへ無効状態を通知します。
 
 ## 制約と注意点
 
@@ -263,6 +291,7 @@ HorizontalPicker(
 - `edgeTapZoneFraction` は `0f` または `0.1f..0.5f` で指定します。
 - デフォルトの値バッジ表示は `step` に応じて小数桁数を自動決定し、最大 6 桁まで表示します。
 - tick 数が極端に多い構成は拒否されます。`Too many ticks. Reduce range size or increase step.` が出た場合は、レンジを狭めるか `step` を大きくしてください。
+- tick/label の描画と `edgeTapZoneFraction` のタップ判定は絶対座標です。RTL レイアウトでもミラーリングされないため、RTL 対応が必要な画面では利用側でレイアウト方向を考慮してください。
 
 ## 公開 API
 
@@ -287,6 +316,7 @@ fun HorizontalPicker(
     label: LabelStyle = LabelStyle(),
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
     edgeTapZoneFraction: Float = 0f,
+    edgeTapIndicator: EdgeTapIndicatorStyle = EdgeTapIndicatorStyle(),
     enabled: Boolean = true
 )
 
@@ -308,6 +338,7 @@ fun HorizontalPicker(
     label: LabelStyle = LabelStyle(formatter = { it.roundToInt().toString() }),
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
     edgeTapZoneFraction: Float = 0f,
+    edgeTapIndicator: EdgeTapIndicatorStyle = EdgeTapIndicatorStyle(),
     enabled: Boolean = true
 )
 
@@ -329,6 +360,7 @@ fun VerticalPicker(
     label: LabelStyle = LabelStyle(),
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
     edgeTapZoneFraction: Float = 0f,
+    edgeTapIndicator: EdgeTapIndicatorStyle = EdgeTapIndicatorStyle(),
     enabled: Boolean = true
 )
 
@@ -350,6 +382,7 @@ fun VerticalPicker(
     label: LabelStyle = LabelStyle(formatter = { it.roundToInt().toString() }),
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
     edgeTapZoneFraction: Float = 0f,
+    edgeTapIndicator: EdgeTapIndicatorStyle = EdgeTapIndicatorStyle(),
     enabled: Boolean = true
 )
 
@@ -358,6 +391,13 @@ data class CenterMarkerStyle(
     val stemWidth: Dp = 4.dp,
     val stemHeight: Dp = 26.dp,
     val showValueBadge: Boolean = true
+)
+
+data class EdgeTapIndicatorStyle(
+    val visible: Boolean = false,
+    val color: Color = Color.Unspecified,
+    val size: Dp = 10.dp,
+    val strokeWidth: Dp = 2.dp
 )
 
 enum class PickerContentRotation(val degrees: Float) {
