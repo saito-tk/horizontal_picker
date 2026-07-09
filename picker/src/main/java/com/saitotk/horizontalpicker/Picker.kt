@@ -348,17 +348,23 @@ private fun Picker(
                 enabled &&
                 !snapshot.isProgrammaticScroll
             ) {
+                // Only vibrate once per snapshot even if a fast fling crosses several ticks in
+                // one frame; still advance hapticIndex to the last crossed tick so later frames
+                // compare against the right baseline.
+                var latestHapticIndex: Int? = null
                 if (previousFloat != null && centeredFloat != null) {
                     forEachCrossedAlignedIndex(previousFloat, centeredFloat, model.lastIndex) { index ->
                         crossedAnyIndex = true
                         if (index != hapticIndex) {
-                            hapticIndex = index
-                            hapticFeedback.performHapticFeedback(haptics)
+                            latestHapticIndex = index
                         }
                     }
                 }
                 if (!crossedAnyIndex && alignedCentered != null && alignedCentered != hapticIndex) {
-                    hapticIndex = alignedCentered
+                    latestHapticIndex = alignedCentered
+                }
+                latestHapticIndex?.let { index ->
+                    hapticIndex = index
                     hapticFeedback.performHapticFeedback(haptics)
                 }
             }
