@@ -10,6 +10,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -145,6 +147,45 @@ class HorizontalPickerUiTest {
         }
         composeRule.waitForIdle()
         assertTrue(value > afterLeftTap)
+    }
+
+    @Test
+    fun disabledPicker_isReportedAsDisabledToAccessibilityServices() {
+        composeRule.setContent {
+            MaterialTheme {
+                HorizontalPicker(
+                    value = 10f,
+                    onValueChange = {},
+                    valueRange = 0f..20f,
+                    step = 1f,
+                    enabled = false,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("picker")
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("picker").assertIsNotEnabled()
+    }
+
+    @Test
+    fun enabledPicker_isReportedAsEnabledToAccessibilityServices() {
+        composeRule.setContent {
+            MaterialTheme {
+                HorizontalPicker(
+                    value = 10f,
+                    onValueChange = {},
+                    valueRange = 0f..20f,
+                    step = 1f,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("picker")
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("picker").assertIsEnabled()
     }
 
     @Test
