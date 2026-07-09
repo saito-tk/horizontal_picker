@@ -70,6 +70,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
 import java.math.BigDecimal
 import java.util.Locale
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -401,6 +402,17 @@ private fun Picker(
     }
     val centerMarkerColor = centerMarker.color.orFallback(MaterialTheme.colorScheme.primary)
     val layoutDirection = LocalLayoutDirection.current
+    val mergedLabelTextStyle = MaterialTheme.typography.labelSmall.merge(label.textStyle)
+    val labelLineHeight = remember(density, mergedLabelTextStyle) {
+        with(density) {
+            val lineHeightSp = if (mergedLabelTextStyle.lineHeight.isSpecified) {
+                mergedLabelTextStyle.lineHeight
+            } else {
+                mergedLabelTextStyle.fontSize
+            }
+            lineHeightSp.toDp().coerceAtLeast(20.dp)
+        }
+    }
     val edgeTapOverlayCrossAxisSize = when (orientation) {
         PickerOrientation.Horizontal -> maxOf(
             contentPadding.calculateTopPadding() + centerMarker.stemHeight,
@@ -445,14 +457,15 @@ private fun Picker(
                 tickStyle = tick,
                 labelStyle = label,
                 contentPadding = contentPadding,
-                layoutDirection = layoutDirection
+                layoutDirection = layoutDirection,
+                labelLineHeight = labelLineHeight
             )
         )
     }
     val trackModifier = when (orientation) {
         PickerOrientation.Horizontal -> Modifier
             .fillMaxWidth()
-            .requiredHeightIn(min = trackHeight(tick, label, contentPadding))
+            .requiredHeightIn(min = trackHeight(tick, label, contentPadding, labelLineHeight))
         PickerOrientation.Vertical -> Modifier
             .fillMaxHeight()
             .requiredWidth(
@@ -460,7 +473,8 @@ private fun Picker(
                     tickStyle = tick,
                     labelStyle = label,
                     contentPadding = contentPadding,
-                    layoutDirection = layoutDirection
+                    layoutDirection = layoutDirection,
+                    labelLineHeight = labelLineHeight
                 )
             )
     }
@@ -538,6 +552,7 @@ private fun Picker(
             contentPadding = contentPadding,
             orientation = orientation,
             contentRotation = contentRotation,
+            labelLineHeight = labelLineHeight,
             modifier = trackModifier
         )
 
@@ -948,12 +963,12 @@ private fun PickerTrackCanvas(
     contentPadding: PaddingValues,
     orientation: PickerOrientation,
     contentRotation: PickerContentRotation,
+    labelLineHeight: Dp,
     modifier: Modifier = Modifier
 ) {
     val textMeasurer = rememberTextMeasurer(cacheSize = 16)
     val colorScheme = MaterialTheme.colorScheme
     val layoutDirection = LocalLayoutDirection.current
-    val labelHeight = 20.dp
     val labelTextStyle = MaterialTheme.typography.labelSmall.merge(labelStyle.textStyle).copy(
         color = labelStyle.color.orFallback(colorScheme.onSurfaceVariant)
     )
@@ -967,7 +982,7 @@ private fun PickerTrackCanvas(
             val topPaddingPx = contentPadding.calculateTopPadding().toPx()
             val startPaddingPx = contentPadding.calculateStartPadding(layoutDirection).toPx()
             val labelTopPaddingPx = if (labelStyle.enabled) labelStyle.topPadding.toPx() else 0f
-            val labelHeightPx = if (labelStyle.enabled) labelHeight.toPx() else 0f
+            val labelHeightPx = if (labelStyle.enabled) labelLineHeight.toPx() else 0f
             val mainAxisSize = orientation.mainAxisSize(size.width, size.height)
             val centerOnMainAxis = mainAxisSize / 2f
             val visibleRadius = mainAxisSize / spacingPx / 2f
@@ -1101,9 +1116,10 @@ private fun PickerTrackCanvas(
 private fun trackHeight(
     tickStyle: TickStyle,
     labelStyle: LabelStyle,
-    contentPadding: PaddingValues
+    contentPadding: PaddingValues,
+    labelLineHeight: Dp
 ): Dp {
-    val labelSpace = if (labelStyle.enabled) labelStyle.topPadding + 20.dp else 0.dp
+    val labelSpace = if (labelStyle.enabled) labelStyle.topPadding + labelLineHeight else 0.dp
     return contentPadding.calculateTopPadding() + tickStyle.majorHeight + labelSpace + contentPadding.calculateBottomPadding()
 }
 
@@ -1111,9 +1127,10 @@ private fun verticalPickerWidth(
     tickStyle: TickStyle,
     labelStyle: LabelStyle,
     contentPadding: PaddingValues,
-    layoutDirection: androidx.compose.ui.unit.LayoutDirection
+    layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+    labelLineHeight: Dp
 ): Dp {
-    val labelSpace = if (labelStyle.enabled) labelStyle.topPadding + 20.dp else 0.dp
+    val labelSpace = if (labelStyle.enabled) labelStyle.topPadding + labelLineHeight else 0.dp
     return contentPadding.calculateStartPadding(layoutDirection) +
         tickStyle.majorHeight +
         labelSpace +
