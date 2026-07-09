@@ -427,14 +427,15 @@ private fun Picker(
     val increaseActionLabel = stringResource(R.string.picker_action_increase)
     val decreaseActionLabel = stringResource(R.string.picker_action_decrease)
     val contentAlpha = if (enabled) 1f else 0.38f
+    val badgeReservedHeight = badgeReservedSize(density.fontScale)
     val edgeTapOverlayCrossAxisSize = when (orientation) {
         PickerOrientation.Horizontal -> maxOf(
             contentPadding.calculateTopPadding() + centerMarker.stemHeight,
-            centerMarker.stemHeight + if (centerMarker.showValueBadge) 20.dp else 0.dp
+            centerMarker.stemHeight + if (centerMarker.showValueBadge) badgeReservedHeight else 0.dp
         )
         PickerOrientation.Vertical -> maxOf(
             contentPadding.calculateEndPadding(layoutDirection) + centerMarker.stemHeight,
-            centerMarker.stemHeight + if (centerMarker.showValueBadge) 20.dp else 0.dp
+            centerMarker.stemHeight + if (centerMarker.showValueBadge) badgeReservedHeight else 0.dp
         )
     }
     val edgeTapOverlayCrossAxisSizePx = remember(density, edgeTapOverlayCrossAxisSize) {
@@ -759,6 +760,7 @@ fun BoxScope.DefaultValueBadge(
     modifier: Modifier = Modifier,
     contentRotation: PickerContentRotation = PickerContentRotation.None
 ) {
+    val badgeOffsetY = -badgeReservedSize(LocalDensity.current.fontScale)
     Layout(
         content = {
             Text(
@@ -782,7 +784,7 @@ fun BoxScope.DefaultValueBadge(
         },
         modifier = modifier
             .align(Alignment.TopCenter)
-            .offset(y = (-20).dp)
+            .offset(y = badgeOffsetY)
     ) { measurables, constraints ->
         val placeable = measurables.single().measure(
             Constraints(

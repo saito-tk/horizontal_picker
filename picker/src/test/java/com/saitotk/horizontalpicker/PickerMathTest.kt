@@ -1,6 +1,7 @@
 package com.saitotk.horizontalpicker
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -151,6 +152,23 @@ class PickerMathTest {
                 overlayCrossAxisSize = 30f
             )
         )
+    }
+
+    @Test
+    fun badgeReservedSize_atDefaultFontScale_matchesOriginalUnscaledLayout() {
+        assertEquals(20.dp, badgeReservedSize(1f))
+    }
+
+    @Test
+    fun badgeReservedSize_growsProportionallyWithLargerFontScale() {
+        assertEquals(30.dp, badgeReservedSize(1.5f))
+        assertEquals(40.dp, badgeReservedSize(2f))
+    }
+
+    @Test
+    fun badgeReservedSize_neverShrinksBelowTheDefault() {
+        assertEquals(20.dp, badgeReservedSize(0.85f))
+        assertEquals(20.dp, badgeReservedSize(0.5f))
     }
 
     @Test
