@@ -943,7 +943,7 @@ private fun PickerTrackCanvas(
     contentRotation: PickerContentRotation,
     modifier: Modifier = Modifier
 ) {
-    val textMeasurer = rememberTextMeasurer()
+    val textMeasurer = rememberTextMeasurer(cacheSize = 16)
     val colorScheme = MaterialTheme.colorScheme
     val layoutDirection = LocalLayoutDirection.current
     val labelHeight = 20.dp
