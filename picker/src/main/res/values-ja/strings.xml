@@ -1,0 +1,6 @@
+<resources>
+    <string name="horizontal_picker_content_description">水平ピッカー</string>
+    <string name="vertical_picker_content_description">垂直ピッカー</string>
+    <string name="picker_action_increase">増やす</string>
+    <string name="picker_action_decrease">減らす</string>
+</resources>
