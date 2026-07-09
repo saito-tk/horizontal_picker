@@ -43,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
@@ -413,6 +414,7 @@ private fun Picker(
             lineHeightSp.toDp().coerceAtLeast(20.dp)
         }
     }
+    val contentAlpha = if (enabled) 1f else 0.38f
     val edgeTapOverlayCrossAxisSize = when (orientation) {
         PickerOrientation.Horizontal -> maxOf(
             contentPadding.calculateTopPadding() + centerMarker.stemHeight,
@@ -553,7 +555,7 @@ private fun Picker(
             orientation = orientation,
             contentRotation = contentRotation,
             labelLineHeight = labelLineHeight,
-            modifier = trackModifier
+            modifier = trackModifier.alpha(contentAlpha)
         )
 
         val markerOverlayModifier = when (orientation) {
@@ -564,7 +566,7 @@ private fun Picker(
                 .align(Alignment.CenterEnd)
         }
 
-        Box(modifier = markerOverlayModifier) {
+        Box(modifier = markerOverlayModifier.alpha(contentAlpha)) {
             if (centerMarker.showValueBadge) {
                 valueBadge(selectedValueLabel, centerMarkerColor)
             }
