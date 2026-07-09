@@ -524,7 +524,7 @@ private fun Picker(
             )
     ) {
         PickerTrackCanvas(
-            currentIndexFloat = currentIndexFloat,
+            currentIndexFloat = { currentIndexFloat },
             model = model,
             tickStyle = tick,
             labelStyle = label,
@@ -934,7 +934,7 @@ private fun Modifier.pickerSemantics(
 
 @Composable
 private fun PickerTrackCanvas(
-    currentIndexFloat: Float,
+    currentIndexFloat: () -> Float,
     model: PickerModel,
     tickStyle: TickStyle,
     labelStyle: LabelStyle,
@@ -953,6 +953,7 @@ private fun PickerTrackCanvas(
 
     Box(
         modifier = modifier.drawBehind {
+            val currentIndex = currentIndexFloat()
             val spacingPx = tickStyle.spacing.toPx()
             val thicknessPx = tickStyle.thickness.toPx()
             val labelWidthPx = labelStyle.width.toPx().roundToInt().coerceAtLeast(1)
@@ -963,8 +964,8 @@ private fun PickerTrackCanvas(
             val mainAxisSize = orientation.mainAxisSize(size.width, size.height)
             val centerOnMainAxis = mainAxisSize / 2f
             val visibleRadius = mainAxisSize / spacingPx / 2f
-            val startIndex = floor(currentIndexFloat - visibleRadius).toInt().coerceAtLeast(0)
-            val endIndex = ceil(currentIndexFloat + visibleRadius).toInt().coerceAtMost(model.lastIndex)
+            val startIndex = floor(currentIndex - visibleRadius).toInt().coerceAtLeast(0)
+            val endIndex = ceil(currentIndex + visibleRadius).toInt().coerceAtMost(model.lastIndex)
             val labelTopY = topPaddingPx + tickStyle.majorHeight.toPx() + labelTopPaddingPx
             val verticalLabelCrossAxisSizePx = if (contentRotation == PickerContentRotation.None) {
                 labelStyle.width.toPx()
@@ -991,7 +992,7 @@ private fun PickerTrackCanvas(
                     TickType.Medium -> tickStyle.mediumHeight.toPx()
                     TickType.Major -> tickStyle.majorHeight.toPx()
                 }
-                val positionOnMainAxis = centerOnMainAxis + (index - currentIndexFloat) * spacingPx
+                val positionOnMainAxis = centerOnMainAxis + (index - currentIndex) * spacingPx
 
                 when (orientation) {
                     PickerOrientation.Horizontal -> drawRect(
