@@ -17,13 +17,17 @@ Jetpack Compose 向けの目盛り式 Picker ライブラリです。中央の�
 
 ## 導入
 
-このリポジトリではライブラリ本体は `:picker` モジュールです。
+Maven Central から追加します。
 
 ```kotlin
 dependencies {
-    implementation(project(":picker"))
+    implementation("io.github.saito-tk:horizontal-picker:0.1.0")
 }
 ```
+
+このリポジトリを直接 checkout して開発する場合、ライブラリ本体は `:picker` モジュールです。
+
+メンテナー向けの公開手順は [`docs/publishing.md`](docs/publishing.md) を参照してください。
 
 ## 基本の使い方
 
