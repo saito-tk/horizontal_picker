@@ -1,6 +1,8 @@
 package com.saitotk.horizontalpicker
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -39,6 +41,52 @@ class PickerMathTest {
 
         assertEquals(101, model.tickCount)
         assertTrue(model.lastIndex == 100)
+    }
+
+    @Test
+    fun pickerModel_lastSelectableValue_doesNotExposeAnUnreachableRangeEnd() {
+        val model = createPickerModel(0f..10f, step = 3f)
+
+        assertEquals(9f, model.indexToValue(model.lastIndex), 0.0001f)
+    }
+
+    @Test
+    fun badgeFormatting_accountsForFractionalRangeStart() {
+        assertEquals(2, decimalPlaces(0.25f))
+        assertEquals(1, decimalPlaces(0.1f))
+        assertEquals("0.25", formatSelectedValueForBadge(0.25f, decimals = 2))
+    }
+
+    @Test
+    fun intPicker_requiresValuesThatFloatCanRepresentExactly() {
+        requireFloatExactIntRange(-16_777_216..16_777_216)
+
+        try {
+            requireFloatExactIntRange(16_777_217..16_777_217)
+            throw AssertionError("Expected requireFloatExactIntRange to reject an inexact Float value")
+        } catch (_: IllegalArgumentException) {
+            // Expected.
+        }
+    }
+
+    @Test
+    fun verticalPickerWidth_reservesTheCorrectLabelAxisForRotation() {
+        val label = LabelStyle(width = 48.dp, topPadding = 8.dp)
+        val tick = TickStyle(majorHeight = 16.dp)
+        val padding = PaddingValues(start = 4.dp, end = 6.dp)
+
+        assertEquals(
+            82.dp,
+            verticalPickerWidth(tick, label, padding, LayoutDirection.Ltr, 20.dp, PickerContentRotation.None)
+        )
+        assertEquals(
+            54.dp,
+            verticalPickerWidth(tick, label, padding, LayoutDirection.Ltr, 20.dp, PickerContentRotation.Clockwise)
+        )
+        assertEquals(
+            82.dp,
+            verticalPickerWidth(tick, label, padding, LayoutDirection.Ltr, 20.dp, PickerContentRotation.UpsideDown)
+        )
     }
 
     @Test

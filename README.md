@@ -73,7 +73,7 @@ VerticalPicker(
 )
 ```
 
-`VerticalPicker` の幅は、`HorizontalPicker` の高さと同じ仕様になるように内部で決まります。通常は sample と同じく高さだけを指定し、外側から `.width(...)` を指定する必要はありません。
+`VerticalPicker` の幅は、目盛りとラベルに必要な幅から内部で決まります。通常は sample と同じく高さだけを指定し、外側から `.width(...)` を指定する必要はありません。`Clockwise` / `CounterClockwise` のときは、回転後のラベルの高さを考慮して幅を計算します。
 
 Activity を portrait のまま固定し、端末を横向きに持って見る用途では、ラベルとデフォルト値バッジだけを回転できます。
 
@@ -289,11 +289,13 @@ HorizontalPicker(
 
 - `Float` API の `step` は `> 0f`、`Int` API の `step` は `> 0` が必要です。
 - `Float` API は `valueRange.start <= valueRange.endInclusive`、`Int` API は `range.first <= range.last` が必要です。
+- `Int` API の `range` は `-16,777,216..16,777,216` の範囲で指定してください。内部のスクロール座標が `Float` のため、この範囲を超える整数は正確に表せず、ライブラリは `IllegalArgumentException` を送出します。
 - 選択可能な値は `start + n * step` です。
 - `valueRange` と `step` が割り切れない場合、上限ぴったりの値は選択できないことがあります。
   例: `0f..10f` と `step = 3f` の選択値は `0, 3, 6, 9` です。
+- この場合、TalkBack などに公開する最大値も、指定レンジの上限ではなく実際に選択できる最終値になります。
 - `edgeTapZoneFraction` は `0f` または `0.1f..0.5f` で指定します。
-- デフォルトの値バッジ表示は `step` に応じて小数桁数を自動決定し、最大 6 桁まで表示します。
+- デフォルトの値バッジ表示はレンジの開始値と `step` に応じて小数桁数を自動決定し、最大 6 桁まで表示します。
 - tick 数が極端に多い構成は拒否されます。`Too many ticks. Reduce range size or increase step.` が出た場合は、レンジを狭めるか `step` を大きくしてください。
 - tick/label の描画と `edgeTapZoneFraction` のタップ判定は絶対座標です。RTL レイアウトでもミラーリングされないため、RTL 対応が必要な画面では利用側でレイアウト方向を考慮してください。
 

@@ -41,6 +41,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.draw.alpha
@@ -226,6 +227,9 @@ private fun Picker(
 
     val hapticFeedback = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
+    val currentOnValueChange by rememberUpdatedState(onValueChange)
+    val currentHaptics by rememberUpdatedState(haptics)
+    val currentEnabled by rememberUpdatedState(enabled)
 
     var currentIndexFloat by remember(model) { mutableFloatStateOf(targetIndex.toFloat()) }
     var emittedIndex by remember(model) { mutableIntStateOf(targetIndex) }
@@ -261,14 +265,16 @@ private fun Picker(
         currentIndexFloat = clampedIndex.toFloat()
         edgeTapAnchorIndex = clampedIndex
 
-        if (triggerHaptic && haptics != null && enabled && clampedIndex != hapticIndex) {
-            hapticIndex = clampedIndex
-            hapticFeedback.performHapticFeedback(haptics)
+        if (triggerHaptic && currentEnabled && clampedIndex != hapticIndex) {
+            currentHaptics?.let { haptics ->
+                hapticIndex = clampedIndex
+                hapticFeedback.performHapticFeedback(haptics)
+            }
         }
 
         if (emitValueChange && clampedIndex != emittedIndex) {
             emittedIndex = clampedIndex
-            onValueChange(model.indexToValue(clampedIndex))
+            currentOnValueChange(model.indexToValue(clampedIndex))
         }
     }
 
@@ -333,7 +339,7 @@ private fun Picker(
         animateToIndex(targetIndex, markProgrammatic = true)
     }
 
-    LaunchedEffect(scrollableState, enabled, haptics, stepPx) {
+    LaunchedEffect(scrollableState, model, stepPx) {
         var previousCenteredIndexFloat: Float? = null
 
         snapshotFlow {
@@ -362,8 +368,8 @@ private fun Picker(
                 edgeTapAnchorIndex = alignedCentered ?: centered
             }
             if (
-                haptics != null &&
-                enabled &&
+                currentHaptics != null &&
+                currentEnabled &&
                 !snapshot.isProgrammaticScroll
             ) {
                 // Only vibrate once per snapshot even if a fast fling crosses several ticks in
@@ -382,8 +388,10 @@ private fun Picker(
                     latestHapticIndex = alignedCentered
                 }
                 latestHapticIndex?.let { index ->
-                    hapticIndex = index
-                    hapticFeedback.performHapticFeedback(haptics)
+                    currentHaptics?.let { haptics ->
+                        hapticIndex = index
+                        hapticFeedback.performHapticFeedback(haptics)
+                    }
                 }
             }
 
@@ -395,13 +403,13 @@ private fun Picker(
                     crossedAnyIndex = true
                     if (index != emittedIndex) {
                         emittedIndex = index
-                        onValueChange(model.indexToValue(index))
+                        currentOnValueChange(model.indexToValue(index))
                     }
                 }
             }
             if (!crossedAnyIndex && alignedCentered != null && alignedCentered != emittedIndex) {
                 emittedIndex = alignedCentered
-                onValueChange(model.indexToValue(alignedCentered))
+                currentOnValueChange(model.indexToValue(alignedCentered))
             }
         }
     }
@@ -413,7 +421,9 @@ private fun Picker(
     val semanticsLabel = remember(reportedValue, actionLabelFormatter) {
         actionLabelFormatter(reportedValue)
     }
-    val badgeDecimalPlaces = remember(step) { stepDecimalPlaces(step) }
+    val badgeDecimalPlaces = remember(model) {
+        maxOf(decimalPlaces(model.start), decimalPlaces(model.step))
+    }
     val selectedValueLabel = remember(reportedValue, badgeDecimalPlaces) {
         formatSelectedValueForBadge(reportedValue, badgeDecimalPlaces)
     }
@@ -483,7 +493,8 @@ private fun Picker(
                 labelStyle = label,
                 contentPadding = contentPadding,
                 layoutDirection = layoutDirection,
-                labelLineHeight = labelLineHeight
+                labelLineHeight = labelLineHeight,
+                contentRotation = contentRotation
             )
         )
     }
@@ -499,7 +510,8 @@ private fun Picker(
                     labelStyle = label,
                     contentPadding = contentPadding,
                     layoutDirection = layoutDirection,
-                    labelLineHeight = labelLineHeight
+                    labelLineHeight = labelLineHeight,
+                    contentRotation = contentRotation
                 )
             )
     }
@@ -528,7 +540,7 @@ private fun Picker(
             )
             .progressSemantics(
                 value = reportedValue,
-                valueRange = model.start..model.endInclusive,
+                valueRange = model.start..model.indexToValue(model.lastIndex),
                 steps = (model.lastIndex - 1).coerceAtLeast(0)
             )
             .pointerInput(
@@ -652,7 +664,12 @@ private fun Picker(
     }
 }
 
-/** Int overload for [HorizontalPicker]. */
+/**
+ * Int overload for [HorizontalPicker].
+ *
+ * The [range] endpoints must be within -16,777,216..16,777,216 so the underlying Float picker
+ * can represent every integer in the range exactly.
+ */
 @Composable
 fun HorizontalPicker(
     value: Int,
@@ -675,6 +692,7 @@ fun HorizontalPicker(
     enabled: Boolean = true
 ) {
     require(step > 0) { "step must be > 0" }
+    requireFloatExactIntRange(range)
 
     HorizontalPicker(
         value = value.toFloat(),
@@ -696,7 +714,12 @@ fun HorizontalPicker(
     )
 }
 
-/** Int overload for [VerticalPicker]. */
+/**
+ * Int overload for [VerticalPicker].
+ *
+ * The [range] endpoints must be within -16,777,216..16,777,216 so the underlying Float picker
+ * can represent every integer in the range exactly.
+ */
 @Composable
 fun VerticalPicker(
     value: Int,
@@ -719,6 +742,7 @@ fun VerticalPicker(
     enabled: Boolean = true
 ) {
     require(step > 0) { "step must be > 0" }
+    requireFloatExactIntRange(range)
 
     VerticalPicker(
         value = value.toFloat(),
@@ -1086,11 +1110,11 @@ private fun PickerTrackCanvas(
             val startIndex = floor(currentIndex - visibleRadius).toInt().coerceAtLeast(0)
             val endIndex = ceil(currentIndex + visibleRadius).toInt().coerceAtMost(model.lastIndex)
             val labelTopY = topPaddingPx + tickStyle.majorHeight.toPx() + labelTopPaddingPx
-            val verticalLabelCrossAxisSizePx = if (contentRotation == PickerContentRotation.None) {
-                labelStyle.width.toPx()
-            } else {
-                labelHeightPx
-            }
+            val verticalLabelCrossAxisSizePx = verticalLabelCrossAxisSize(
+                labelStyle = labelStyle,
+                labelLineHeight = labelLineHeight,
+                contentRotation = contentRotation
+            ).toPx()
             val verticalTickStartX = startPaddingPx + verticalLabelCrossAxisSizePx + labelTopPaddingPx
             val verticalTickEndX = verticalTickStartX + tickStyle.majorHeight.toPx()
             val verticalLabelStartX = startPaddingPx
@@ -1174,7 +1198,7 @@ private fun PickerTrackCanvas(
                             }
                         }
                         PickerOrientation.Vertical -> {
-                            val textCenter = if (contentRotation == PickerContentRotation.None) {
+                            val textCenter = if (!contentRotation.swapsLabelAxes()) {
                                 Offset(
                                     x = verticalLabelStartX + textLayoutResult.size.width / 2f,
                                     y = positionOnMainAxis
@@ -1220,18 +1244,35 @@ private fun trackHeight(
     return contentPadding.calculateTopPadding() + tickStyle.majorHeight + labelSpace + contentPadding.calculateBottomPadding()
 }
 
-private fun verticalPickerWidth(
+internal fun verticalPickerWidth(
     tickStyle: TickStyle,
     labelStyle: LabelStyle,
     contentPadding: PaddingValues,
     layoutDirection: androidx.compose.ui.unit.LayoutDirection,
-    labelLineHeight: Dp
+    labelLineHeight: Dp,
+    contentRotation: PickerContentRotation
 ): Dp {
-    val labelSpace = if (labelStyle.enabled) labelStyle.topPadding + labelLineHeight else 0.dp
+    val labelSpace = if (labelStyle.enabled) {
+        labelStyle.topPadding + verticalLabelCrossAxisSize(labelStyle, labelLineHeight, contentRotation)
+    } else {
+        0.dp
+    }
     return contentPadding.calculateStartPadding(layoutDirection) +
         tickStyle.majorHeight +
         labelSpace +
         contentPadding.calculateEndPadding(layoutDirection)
+}
+
+private fun verticalLabelCrossAxisSize(
+    labelStyle: LabelStyle,
+    labelLineHeight: Dp,
+    contentRotation: PickerContentRotation
+): Dp {
+    return if (contentRotation.swapsLabelAxes()) labelLineHeight else labelStyle.width
+}
+
+private fun PickerContentRotation.swapsLabelAxes(): Boolean {
+    return this == PickerContentRotation.Clockwise || this == PickerContentRotation.CounterClockwise
 }
 
 private fun alignedCenteredIndex(
@@ -1439,7 +1480,7 @@ internal fun edgeTapStepDelta(
     }
 }
 
-private fun formatSelectedValueForBadge(value: Float, decimals: Int): String {
+internal fun formatSelectedValueForBadge(value: Float, decimals: Int): String {
     return if (decimals == 0) {
         value.roundToInt().toString()
     } else {
@@ -1447,11 +1488,22 @@ private fun formatSelectedValueForBadge(value: Float, decimals: Int): String {
     }
 }
 
-private fun stepDecimalPlaces(step: Float): Int {
+internal fun decimalPlaces(value: Float): Int {
     val scale = try {
-        BigDecimal.valueOf(step.toDouble()).stripTrailingZeros().scale()
+        BigDecimal(value.toString()).stripTrailingZeros().scale()
     } catch (_: NumberFormatException) {
         0
     }
     return scale.coerceAtLeast(0).coerceAtMost(6)
+}
+
+private const val MAX_EXACT_FLOAT_INT = 1 shl 24
+
+internal fun requireFloatExactIntRange(range: IntRange) {
+    require(range.first in -MAX_EXACT_FLOAT_INT..MAX_EXACT_FLOAT_INT &&
+        range.last in -MAX_EXACT_FLOAT_INT..MAX_EXACT_FLOAT_INT
+    ) {
+        "Int picker values must be within -$MAX_EXACT_FLOAT_INT..$MAX_EXACT_FLOAT_INT because the " +
+            "underlying picker uses Float coordinates."
+    }
 }
