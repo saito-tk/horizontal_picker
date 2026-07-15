@@ -52,7 +52,7 @@ mavenPublishing {
     publishToMavenCentral()
     signAllPublications()
 
-    coordinates("io.github.saito-tk", "horizontal-picker", "0.1.0")
+    coordinates("io.github.saito-tk", "horizontal-picker", "0.1.1")
 
     pom {
         name.set("Horizontal / Vertical Picker for Jetpack Compose")

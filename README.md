@@ -21,7 +21,7 @@ Maven Central から追加します。
 
 ```kotlin
 dependencies {
-    implementation("io.github.saito-tk:horizontal-picker:0.1.0")
+    implementation("io.github.saito-tk:horizontal-picker:0.1.1")
 }
 ```
 
