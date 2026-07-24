@@ -17,7 +17,20 @@ Jetpack Compose 向けの目盛り式 Picker ライブラリです。中央の�
 
 ## 導入
 
-Maven Central から追加します。
+`0.1.1` は Maven Central で公開済みです。通常の Android プロジェクトはすでに `mavenCentral()` を設定済みなので、追加の repository 設定は不要です。
+
+`mavenCentral()` が未設定のプロジェクトだけ、`settings.gradle.kts` の repository に追加してください。
+
+```kotlin
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+```
+
+アプリモジュールの `build.gradle.kts` に依存関係を追加します。
 
 ```kotlin
 dependencies {
@@ -25,7 +38,14 @@ dependencies {
 }
 ```
 
-このリポジトリを直接 checkout して開発する場合、ライブラリ本体は `:picker` モジュールです。
+利用する Picker を import します。
+
+```kotlin
+import com.saitotk.horizontalpicker.HorizontalPicker
+import com.saitotk.horizontalpicker.VerticalPicker
+```
+
+このリポジトリを直接 checkout して開発する場合、ライブラリ本体は `:picker` モジュールです。公開済みの変更内容は [CHANGELOG](CHANGELOG.md)、ライセンスは [MIT License](LICENSE.md) を参照してください。
 
 メンテナー向けの公開手順は [`docs/publishing.md`](docs/publishing.md) を参照してください。
 
