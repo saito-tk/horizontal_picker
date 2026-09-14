@@ -1,6 +1,10 @@
 package com.saitotk.horizontalpicker
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
@@ -97,14 +101,15 @@ class HorizontalPickerUiTest {
 
     @Test
     fun secondSwipe_isStillAccepted() {
-        var value by mutableFloatStateOf(10f)
+        // Keep both flings away from the range edges on wide/high-density emulators.
+        var value by mutableFloatStateOf(500f)
 
         composeRule.setContent {
             MaterialTheme {
                 HorizontalPicker(
                     value = value,
                     onValueChange = { value = it },
-                    valueRange = 0f..20f,
+                    valueRange = 0f..1000f,
                     step = 1f,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -164,22 +169,24 @@ class HorizontalPickerUiTest {
     fun edgeTapIndicator_visibleTrue_drawsChevronsNearBothEdges() {
         composeRule.setContent {
             MaterialTheme {
-                HorizontalPicker(
-                    value = 10f,
-                    onValueChange = {},
-                    valueRange = 0f..20f,
-                    step = 1f,
-                    edgeTapZoneFraction = 0.3f,
-                    edgeTapIndicator = EdgeTapIndicatorStyle(
-                        visible = true,
-                        color = Color.Red,
-                        size = 16.dp,
-                        strokeWidth = 4.dp
-                    ),
-                    modifier = Modifier
-                        .width(300.dp)
-                        .testTag("picker")
-                )
+                Box(Modifier.windowInsetsPadding(WindowInsets.safeDrawing)) {
+                    HorizontalPicker(
+                        value = 10f,
+                        onValueChange = {},
+                        valueRange = 0f..20f,
+                        step = 1f,
+                        edgeTapZoneFraction = 0.3f,
+                        edgeTapIndicator = EdgeTapIndicatorStyle(
+                            visible = true,
+                            color = Color.Red,
+                            size = 16.dp,
+                            strokeWidth = 4.dp
+                        ),
+                        modifier = Modifier
+                            .width(300.dp)
+                            .testTag("picker")
+                    )
+                }
             }
         }
 

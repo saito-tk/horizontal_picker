@@ -46,11 +46,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -86,8 +89,6 @@ import java.util.Locale
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.abs
-import kotlin.math.ceil
-import kotlin.math.floor
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
@@ -96,6 +97,8 @@ import kotlin.math.roundToInt
  *
  * The picker maps one tick to one discrete value step. When scrolling stops, it snaps to the
  * nearest tick and reports a canonical stepped value through [onValueChange].
+ * Optional [progress] highlights reached ticks without changing selection; omit it for the
+ * standard appearance. Read observable progress state inside [PickerProgress.value].
  *
  * Note: tick/label drawing and the [edgeTapZoneFraction] hit zones use absolute (not
  * layout-direction-aware) coordinates, so the picker does not mirror in RTL layouts.
@@ -119,7 +122,8 @@ fun HorizontalPicker(
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
     edgeTapZoneFraction: Float = 0f,
     edgeTapIndicator: EdgeTapIndicatorStyle = EdgeTapIndicatorStyle(),
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    progress: PickerProgress? = null
 ) {
     Picker(
         orientation = PickerOrientation.Horizontal,
@@ -138,7 +142,8 @@ fun HorizontalPicker(
         haptics = haptics,
         edgeTapZoneFraction = edgeTapZoneFraction,
         edgeTapIndicator = edgeTapIndicator,
-        enabled = enabled
+        enabled = enabled,
+        progress = progress
     )
 }
 
@@ -147,6 +152,7 @@ fun HorizontalPicker(
  *
  * Use this instead of rotating [HorizontalPicker] when the picker should be displayed at 90 degrees.
  * The gesture axis, fling velocity, drawing axis, and edge tap zones all use vertical coordinates.
+ * Optional [progress] has the same visual-only behavior as in [HorizontalPicker].
  */
 @Composable
 fun VerticalPicker(
@@ -167,7 +173,8 @@ fun VerticalPicker(
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
     edgeTapZoneFraction: Float = 0f,
     edgeTapIndicator: EdgeTapIndicatorStyle = EdgeTapIndicatorStyle(),
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    progress: PickerProgress? = null
 ) {
     Picker(
         orientation = PickerOrientation.Vertical,
@@ -186,7 +193,8 @@ fun VerticalPicker(
         haptics = haptics,
         edgeTapZoneFraction = edgeTapZoneFraction,
         edgeTapIndicator = edgeTapIndicator,
-        enabled = enabled
+        enabled = enabled,
+        progress = progress
     )
 }
 
@@ -208,7 +216,8 @@ private fun Picker(
     haptics: HapticFeedbackType?,
     edgeTapZoneFraction: Float,
     edgeTapIndicator: EdgeTapIndicatorStyle,
-    enabled: Boolean
+    enabled: Boolean,
+    progress: PickerProgress?
 ) {
     require(edgeTapZoneFraction == 0f || edgeTapZoneFraction in 0.1f..0.5f) {
         "edgeTapZoneFraction must be 0f (off) or in 0.1f..0.5f"
@@ -595,6 +604,7 @@ private fun Picker(
             orientation = orientation,
             contentRotation = contentRotation,
             labelLineHeight = labelLineHeight,
+            progress = progress,
             modifier = trackModifier.alpha(contentAlpha)
         )
 
@@ -689,7 +699,8 @@ fun HorizontalPicker(
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
     edgeTapZoneFraction: Float = 0f,
     edgeTapIndicator: EdgeTapIndicatorStyle = EdgeTapIndicatorStyle(),
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    progress: PickerProgress? = null
 ) {
     require(step > 0) { "step must be > 0" }
     requireFloatExactIntRange(range)
@@ -710,7 +721,8 @@ fun HorizontalPicker(
         haptics = haptics,
         edgeTapZoneFraction = edgeTapZoneFraction,
         edgeTapIndicator = edgeTapIndicator,
-        enabled = enabled
+        enabled = enabled,
+        progress = progress
     )
 }
 
@@ -739,7 +751,8 @@ fun VerticalPicker(
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
     edgeTapZoneFraction: Float = 0f,
     edgeTapIndicator: EdgeTapIndicatorStyle = EdgeTapIndicatorStyle(),
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    progress: PickerProgress? = null
 ) {
     require(step > 0) { "step must be > 0" }
     requireFloatExactIntRange(range)
@@ -760,7 +773,8 @@ fun VerticalPicker(
         haptics = haptics,
         edgeTapZoneFraction = edgeTapZoneFraction,
         edgeTapIndicator = edgeTapIndicator,
-        enabled = enabled
+        enabled = enabled,
+        progress = progress
     )
 }
 
@@ -1085,9 +1099,108 @@ private fun PickerTrackCanvas(
     orientation: PickerOrientation,
     contentRotation: PickerContentRotation,
     labelLineHeight: Dp,
+    progress: PickerProgress?,
     modifier: Modifier = Modifier
 ) {
-    val textMeasurer = rememberTextMeasurer(cacheSize = 16)
+    val colorScheme = MaterialTheme.colorScheme
+    val layoutDirection = LocalLayoutDirection.current
+    Box(modifier = modifier) {
+        // Separate display lists: progress invalidates ticks, not label measurement/drawing.
+        Box(
+            Modifier.matchParentSize().graphicsLayer().drawWithCache {
+                val spacingPx = tickStyle.spacing.toPx().coerceAtLeast(1f)
+                val thicknessPx = tickStyle.thickness.toPx()
+                val mainAxisSize = orientation.mainAxisSize(size.width, size.height)
+                val ticks = PickerTickBuffer(model, mainAxisSize, spacingPx)
+                val topPaddingPx = contentPadding.calculateTopPadding().toPx()
+                val verticalTickEndX = contentPadding.calculateStartPadding(layoutDirection).toPx() +
+                    verticalLabelCrossAxisSize(labelStyle, labelLineHeight, contentRotation).toPx() +
+                    (if (labelStyle.enabled) labelStyle.topPadding.toPx() else 0f) +
+                    tickStyle.majorHeight.toPx()
+                // Three appearances are shared by every visible tick. Neither scroll nor progress
+                // is read while building this cache, so scrolling reuses the primitive buffers.
+                val appearances = (0..2).map { type ->
+                    val normalColor = when (type) {
+                        2 -> tickStyle.majorColor.orFallback(colorScheme.onSurface)
+                        1 -> tickStyle.mediumColor.orFallback(colorScheme.outline)
+                        else -> tickStyle.minorColor.orFallback(colorScheme.outlineVariant)
+                    }
+                    val heightPx = when (type) {
+                        2 -> tickStyle.majorHeight
+                        1 -> tickStyle.mediumHeight
+                        else -> tickStyle.minorHeight
+                    }.toPx()
+                    val tickSize = when (orientation) {
+                        PickerOrientation.Horizontal -> Size(thicknessPx, heightPx)
+                        PickerOrientation.Vertical -> Size(heightPx, thicknessPx)
+                    }
+                    PickerTickAppearance(
+                        size = tickSize,
+                        normalColor = normalColor,
+                        reachedColor = (progress?.color ?: Color.Unspecified).orFallback(
+                            lerp(normalColor, Color.White, 0.35f).copy(alpha = normalColor.alpha)
+                        )
+                    )
+                }
+                onDrawBehind {
+                    ticks.update(currentIndexFloat())
+                    val progressValue = progress?.value?.invoke() ?: Float.NaN
+                    for (slot in 0 until ticks.count) {
+                        val index = ticks.firstIndex + slot
+                        val type = when {
+                            tickStyle.majorEvery > 0 && index % tickStyle.majorEvery == 0 -> 2
+                            tickStyle.mediumEvery > 0 && index % tickStyle.mediumEvery == 0 -> 1
+                            else -> 0
+                        }
+                        val tick = appearances[type]
+                        val position = ticks.positions[slot]
+                        val topLeft = when (orientation) {
+                            PickerOrientation.Horizontal -> Offset(position - thicknessPx / 2f, topPaddingPx)
+                            PickerOrientation.Vertical -> Offset(verticalTickEndX - tick.size.width, position - thicknessPx / 2f)
+                        }
+                        drawRect(
+                            color = if (isTickReached(ticks.values[slot], progressValue)) tick.reachedColor else tick.normalColor,
+                            topLeft = topLeft,
+                            size = tick.size
+                        )
+                    }
+                }
+            }
+        )
+        PickerLabelLayer(
+            currentIndexFloat = currentIndexFloat,
+            model = model,
+            tickStyle = tickStyle,
+            labelStyle = labelStyle,
+            contentPadding = contentPadding,
+            orientation = orientation,
+            contentRotation = contentRotation,
+            labelLineHeight = labelLineHeight,
+            modifier = Modifier.matchParentSize().graphicsLayer()
+        )
+    }
+}
+
+private data class PickerTickAppearance(
+    val size: Size,
+    val normalColor: Color,
+    val reachedColor: Color
+)
+
+@Composable
+private fun PickerLabelLayer(
+    currentIndexFloat: () -> Float,
+    model: PickerModel,
+    tickStyle: TickStyle,
+    labelStyle: LabelStyle,
+    contentPadding: PaddingValues,
+    orientation: PickerOrientation,
+    contentRotation: PickerContentRotation,
+    labelLineHeight: Dp,
+    modifier: Modifier = Modifier
+) {
+    // Bounded LRU: dense labels should not evict an entire normal-sized viewport each frame.
+    val textMeasurer = rememberTextMeasurer(cacheSize = 128)
     val colorScheme = MaterialTheme.colorScheme
     val layoutDirection = LocalLayoutDirection.current
     val labelTextStyle = MaterialTheme.typography.labelSmall.merge(labelStyle.textStyle).copy(
@@ -1096,9 +1209,9 @@ private fun PickerTrackCanvas(
 
     Box(
         modifier = modifier.drawBehind {
+            if (!labelStyle.enabled || labelStyle.showEvery <= 0) return@drawBehind
             val currentIndex = currentIndexFloat()
-            val spacingPx = tickStyle.spacing.toPx()
-            val thicknessPx = tickStyle.thickness.toPx()
+            val spacingPx = tickStyle.spacing.toPx().coerceAtLeast(1f)
             val labelWidthPx = labelStyle.width.toPx().roundToInt().coerceAtLeast(1)
             val topPaddingPx = contentPadding.calculateTopPadding().toPx()
             val startPaddingPx = contentPadding.calculateStartPadding(layoutDirection).toPx()
@@ -1106,127 +1219,42 @@ private fun PickerTrackCanvas(
             val labelHeightPx = if (labelStyle.enabled) labelLineHeight.toPx() else 0f
             val mainAxisSize = orientation.mainAxisSize(size.width, size.height)
             val centerOnMainAxis = mainAxisSize / 2f
-            val visibleRadius = mainAxisSize / spacingPx / 2f
-            val startIndex = floor(currentIndex - visibleRadius).toInt().coerceAtLeast(0)
-            val endIndex = ceil(currentIndex + visibleRadius).toInt().coerceAtMost(model.lastIndex)
+            val visibleIndices = visibleTickIndices(currentIndex, mainAxisSize, spacingPx, model.lastIndex)
             val labelTopY = topPaddingPx + tickStyle.majorHeight.toPx() + labelTopPaddingPx
-            val verticalLabelCrossAxisSizePx = verticalLabelCrossAxisSize(
-                labelStyle = labelStyle,
-                labelLineHeight = labelLineHeight,
-                contentRotation = contentRotation
-            ).toPx()
-            val verticalTickStartX = startPaddingPx + verticalLabelCrossAxisSizePx + labelTopPaddingPx
-            val verticalTickEndX = verticalTickStartX + tickStyle.majorHeight.toPx()
             val verticalLabelStartX = startPaddingPx
-            val minorTickColor = tickStyle.minorColor.orFallback(colorScheme.outlineVariant)
-            val mediumTickColor = tickStyle.mediumColor.orFallback(colorScheme.outline)
-            val majorTickColor = tickStyle.majorColor.orFallback(colorScheme.onSurface)
-            val minorTickHeightPx = tickStyle.minorHeight.toPx()
-            val mediumTickHeightPx = tickStyle.mediumHeight.toPx()
-            val majorTickHeightPx = tickStyle.majorHeight.toPx()
 
-            for (index in startIndex..endIndex) {
-                val tickType = when {
-                    tickStyle.majorEvery > 0 && index % tickStyle.majorEvery == 0 -> TickType.Major
-                    tickStyle.mediumEvery > 0 && index % tickStyle.mediumEvery == 0 -> TickType.Medium
-                    else -> TickType.Minor
-                }
-                val tickColor = when (tickType) {
-                    TickType.Minor -> minorTickColor
-                    TickType.Medium -> mediumTickColor
-                    TickType.Major -> majorTickColor
-                }
-                val tickHeightPx = when (tickType) {
-                    TickType.Minor -> minorTickHeightPx
-                    TickType.Medium -> mediumTickHeightPx
-                    TickType.Major -> majorTickHeightPx
-                }
+            for (index in visibleLabelIndices(visibleIndices, labelStyle.enabled, labelStyle.showEvery)) {
                 val positionOnMainAxis = centerOnMainAxis + (index - currentIndex) * spacingPx
 
-                when (orientation) {
-                    PickerOrientation.Horizontal -> drawRect(
-                        color = tickColor,
-                        topLeft = Offset(
-                            x = positionOnMainAxis - thicknessPx / 2f,
-                            y = topPaddingPx
-                        ),
-                        size = Size(width = thicknessPx, height = tickHeightPx)
+                val textLayoutResult = textMeasurer.measure(
+                    text = AnnotatedString(labelStyle.formatter(model.indexToValue(index))),
+                    style = labelTextStyle,
+                    maxLines = 1,
+                    overflow = TextOverflow.Clip,
+                    constraints = Constraints(maxWidth = labelWidthPx)
+                )
+                val textCenter = when (orientation) {
+                    PickerOrientation.Horizontal -> Offset(
+                        positionOnMainAxis, labelTopY + labelHeightPx / 2f
                     )
-                    PickerOrientation.Vertical -> drawRect(
-                        color = tickColor,
-                        topLeft = Offset(
-                            x = verticalTickEndX - tickHeightPx,
-                            y = positionOnMainAxis - thicknessPx / 2f
-                        ),
-                        size = Size(width = tickHeightPx, height = thicknessPx)
+                    PickerOrientation.Vertical -> Offset(
+                        verticalLabelStartX + if (contentRotation.swapsLabelAxes()) {
+                            labelHeightPx / 2f
+                        } else {
+                            textLayoutResult.size.width / 2f
+                        },
+                        positionOnMainAxis
                     )
                 }
-
-                val showLabel = labelStyle.enabled &&
-                    labelStyle.showEvery > 0 &&
-                    index % labelStyle.showEvery == 0
-                if (showLabel) {
-                    val textLayoutResult = textMeasurer.measure(
-                        text = AnnotatedString(labelStyle.formatter(model.indexToValue(index))),
-                        style = labelTextStyle,
-                        maxLines = 1,
-                        overflow = TextOverflow.Clip,
-                        constraints = Constraints(maxWidth = labelWidthPx)
-                    )
-                    when (orientation) {
-                        PickerOrientation.Horizontal -> {
-                            val textCenter = Offset(
-                                x = positionOnMainAxis,
-                                y = labelTopY + labelHeightPx / 2f
-                            )
-                            val textTopLeft = Offset(
-                                x = textCenter.x - textLayoutResult.size.width / 2f,
-                                y = textCenter.y - textLayoutResult.size.height / 2f
-                            )
-                            if (contentRotation == PickerContentRotation.None) {
-                                drawText(
-                                    textLayoutResult = textLayoutResult,
-                                    topLeft = textTopLeft
-                                )
-                            } else {
-                                rotate(degrees = contentRotation.degrees, pivot = textCenter) {
-                                    drawText(
-                                        textLayoutResult = textLayoutResult,
-                                        topLeft = textTopLeft
-                                    )
-                                }
-                            }
-                        }
-                        PickerOrientation.Vertical -> {
-                            val textCenter = if (!contentRotation.swapsLabelAxes()) {
-                                Offset(
-                                    x = verticalLabelStartX + textLayoutResult.size.width / 2f,
-                                    y = positionOnMainAxis
-                                )
-                            } else {
-                                Offset(
-                                    x = verticalLabelStartX + labelHeightPx / 2f,
-                                    y = positionOnMainAxis
-                                )
-                            }
-                            val textTopLeft = Offset(
-                                x = textCenter.x - textLayoutResult.size.width / 2f,
-                                y = textCenter.y - textLayoutResult.size.height / 2f
-                            )
-                            if (contentRotation == PickerContentRotation.None) {
-                                drawText(
-                                    textLayoutResult = textLayoutResult,
-                                    topLeft = textTopLeft
-                                )
-                            } else {
-                                rotate(degrees = contentRotation.degrees, pivot = textCenter) {
-                                    drawText(
-                                        textLayoutResult = textLayoutResult,
-                                        topLeft = textTopLeft
-                                    )
-                                }
-                            }
-                        }
+                val textTopLeft = Offset(
+                    textCenter.x - textLayoutResult.size.width / 2f,
+                    textCenter.y - textLayoutResult.size.height / 2f
+                )
+                if (contentRotation == PickerContentRotation.None) {
+                    drawText(textLayoutResult, topLeft = textTopLeft)
+                } else {
+                    rotate(degrees = contentRotation.degrees, pivot = textCenter) {
+                        drawText(textLayoutResult, topLeft = textTopLeft)
                     }
                 }
             }

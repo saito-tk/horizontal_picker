@@ -77,6 +77,63 @@ HorizontalPicker(
 )
 ```
 
+### 選択値とは別の進捗を目盛りで表示する（未リリース）
+
+この機能はリポジトリの開発版に含まれます。Maven Central 公開済みの `0.1.1` にはまだ含まれません。
+
+既存の引数はそのままで、必要な場合だけ `progress` を追加できます。省略時（`null`）は従来の表示・操作のままです。横向き/縦向き、`Int`/`Float` のいずれでも使えます。
+
+```kotlin
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import com.saitotk.horizontalpicker.HorizontalPicker
+import com.saitotk.horizontalpicker.PickerProgress
+import kotlinx.coroutines.delay
+
+@Composable
+fun ElapsedTimePicker() {
+    var selected by rememberSaveable { mutableIntStateOf(55) }
+    val elapsed = rememberSaveable { mutableIntStateOf(0) }
+
+    // デモ用タイマー。実際の経過時間はアプリ側の ViewModel などで管理できます。
+    LaunchedEffect(Unit) {
+        while (elapsed.intValue < 600) {
+            delay(1_000)
+            elapsed.intValue++
+        }
+    }
+
+    HorizontalPicker(
+        value = selected,
+        onValueChange = { selected = it },
+        range = 0..600,
+        step = 1,
+        progress = PickerProgress(value = { elapsed.intValue.toFloat() })
+    )
+}
+```
+
+- 進捗が `55f` なら `0..55` の目盛りを明るくします。`0f` では `0` の目盛りだけが対象です。
+- 判定は「目盛りの値 ≤ 進捗値」です。`step` に合わせた四捨五入はしません。開始値が `10` なら `10` から、負数の範囲ならその開始値から色が変わります。
+- 範囲の開始より小さい場合は強調なし、終端より大きい場合は全目盛りが対象です。`NaN` / 無限大は強調なしとして扱います。値を戻すと、超過した目盛りの色も元に戻ります。
+- デフォルトでは各目盛りの元の色を白へ 35% 近づけ、不透明度は維持します。白い目盛りや明るい背景では差が小さいため、`PickerProgress(value = { ... }, color = Color.Cyan)` のように明示色も指定できます。
+- 進捗更新では選択値、スクロール位置、値バッジ、ラベル、`onValueChange`、振動は変わりません。自動追従スクロールはしません。画面外の目盛りはスクロールして表示された時点で現在の進捗色になります。
+- アクセシビリティ上の値は従来どおり選択値です。進捗も読み上げたい場合は、アプリ側で別の `Text` などを用意してください。
+
+#### 更新時の負荷
+
+進捗の Compose State は **`value` ラムダの中で**読み取ってください。通常の変数を変更するだけでは再描画されません。ラムダの外で State を読んで毎秒 Picker の引数を作り直すと、この最適化の効果が薄れます。ラムダには重い処理や副作用を含めず、現在値を返すだけにします。
+
+進捗は Compose の描画フェーズだけで読み、目盛りの描画レイヤーだけを更新します。位置・サイズ・色の情報はキャッシュし、数字ラベルは別レイヤーにしています。進捗だけが変わる場合、Picker の再構成・再レイアウトやラベルの再計算は不要です。
+
+厳密な「変化した 1 本のピクセルだけの更新」ではありません。**画面内と端の目盛りだけを再描画**します。`0..600` の 601 本すべてを生成し直すことはなく、更新量は全範囲ではなく表示幅と目盛り間隔に依存します。スクロール・サイズ・スタイルなどが変わった場合は、必要な描画情報を再計算します。描画負荷がゼロになる保証ではありません。
+
+設計の背景: [Compose の描画フェーズ](https://developer.android.com/develop/ui/compose/phases)、[描画キャッシュと graphicsLayer](https://developer.android.com/develop/ui/compose/graphics/draw/modifiers)。
+
 ### VerticalPicker
 
 `HorizontalPicker` を `Modifier.rotate(90f)` で回転させると、見た目とスクロール入力の座標軸がずれてフリングや端タップが安定しません。縦向きで表示したい場合は `VerticalPicker` を使います。
@@ -319,7 +376,19 @@ HorizontalPicker(
 - tick 数が極端に多い構成は拒否されます。`Too many ticks. Reduce range size or increase step.` が出た場合は、レンジを狭めるか `step` を大きくしてください。
 - tick/label の描画と `edgeTapZoneFraction` のタップ判定は絶対座標です。RTL レイアウトでもミラーリングされないため、RTL 対応が必要な画面では利用側でレイアウト方向を考慮してください。
 
+## 内部の軽量化（未リリース）
+
+既存の引数、スナップのばね設定・移動量、端タップ、選択値通知の順序を維持しながら、以下を最適化しています。
+
+- 可視目盛りの座標と値をプリミティブ配列に保持し、スクロール中も再利用します。保持量は全範囲ではなく表示領域に依存します。
+- ラベルのあるインデックスだけを走査します。文字計測の LRU キャッシュは最大 128 件で、密なラベル設定での再計測を減らします。必要な分だけ保持し、無制限には増やしません。
+- ラベルの `formatter` は描画時に評価するままなので、ラムダ内で読む Compose State の変更も反映できます。アプリ側の重いフォーマット処理まで自動的に軽くなるわけではありません。
+
+配列の再利用、旧処理との判定一致、既存操作・進捗表示の UI 回帰をテストしています。実機での FPS・消費電力の改善率を測定した結果ではなく、端末やラベル設定によって効果は異なります。
+
 ## 公開 API
+
+以下は開発版の API です。`progress` / `PickerProgress` は未リリースの追加項目です。
 
 主な公開APIは `picker/src/main/java/com/saitotk/horizontalpicker/Picker.kt` にあります。ライブラリ名と package は `horizontalpicker` のままですが、利用側は用途に応じて `HorizontalPicker` または `VerticalPicker` を呼び分けます。
 
@@ -343,7 +412,8 @@ fun HorizontalPicker(
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
     edgeTapZoneFraction: Float = 0f,
     edgeTapIndicator: EdgeTapIndicatorStyle = EdgeTapIndicatorStyle(),
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    progress: PickerProgress? = null
 )
 
 @Composable
@@ -365,7 +435,8 @@ fun HorizontalPicker(
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
     edgeTapZoneFraction: Float = 0f,
     edgeTapIndicator: EdgeTapIndicatorStyle = EdgeTapIndicatorStyle(),
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    progress: PickerProgress? = null
 )
 
 @Composable
@@ -387,7 +458,8 @@ fun VerticalPicker(
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
     edgeTapZoneFraction: Float = 0f,
     edgeTapIndicator: EdgeTapIndicatorStyle = EdgeTapIndicatorStyle(),
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    progress: PickerProgress? = null
 )
 
 @Composable
@@ -409,7 +481,13 @@ fun VerticalPicker(
     haptics: HapticFeedbackType? = HapticFeedbackType.TextHandleMove,
     edgeTapZoneFraction: Float = 0f,
     edgeTapIndicator: EdgeTapIndicatorStyle = EdgeTapIndicatorStyle(),
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    progress: PickerProgress? = null
+)
+
+data class PickerProgress(
+    val value: () -> Float,
+    val color: Color = Color.Unspecified
 )
 
 data class CenterMarkerStyle(

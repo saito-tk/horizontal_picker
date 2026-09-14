@@ -3,10 +3,25 @@ package com.saitotk.horizontalpicker
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
 
 private const val EPSILON = 1e-4f
+
+internal fun visibleLabelIndices(visible: IntRange, enabled: Boolean, every: Int): IntProgression {
+    if (!enabled || every <= 0 || visible.isEmpty()) return IntRange.EMPTY
+    val first = ((visible.first.toLong() + every - 1) / every) * every
+    if (first > visible.last) return IntRange.EMPTY
+    return first.toInt()..visible.last step every
+}
+
+/** One extra tick at each edge covers partially visible ticks; no full-range allocation. */
+internal fun visibleTickIndices(currentIndex: Float, mainAxisSize: Float, spacingPx: Float, lastIndex: Int): IntRange {
+    val radius = mainAxisSize / spacingPx.coerceAtLeast(1f) / 2f
+    return floor(currentIndex - radius).toInt().coerceAtLeast(0)..
+        ceil(currentIndex + radius).toInt().coerceAtMost(lastIndex)
+}
 
 internal data class PickerModel(
     val start: Float,
