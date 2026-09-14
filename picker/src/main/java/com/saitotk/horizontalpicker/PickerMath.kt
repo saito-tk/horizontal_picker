@@ -9,6 +9,21 @@ import kotlin.math.roundToInt
 
 private const val EPSILON = 1e-4f
 
+/** Same order and boundary inclusion as walking every crossed tick center. */
+internal fun crossedAlignedIndices(from: Float, to: Float): IntProgression = when {
+    to > from -> (floor(from).toInt() + 1)..floor(to).toInt()
+    to < from -> (ceil(from).toInt() - 1) downTo ceil(to).toInt()
+    else -> IntRange.EMPTY
+}
+
+/** Haptics notify once per frame, unlike value callbacks which still notify every crossed tick. */
+internal fun lastCrossedIndexOtherThan(indices: IntProgression, previous: Int): Int? = when {
+    indices.isEmpty() -> null
+    indices.last != previous -> indices.last
+    indices.first != indices.last -> indices.last - indices.step
+    else -> null
+}
+
 internal fun visibleLabelIndices(visible: IntRange, enabled: Boolean, every: Int): IntProgression {
     if (!enabled || every <= 0 || visible.isEmpty()) return IntRange.EMPTY
     val first = ((visible.first.toLong() + every - 1) / every) * every

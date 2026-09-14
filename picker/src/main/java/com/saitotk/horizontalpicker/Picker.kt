@@ -86,7 +86,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import java.math.BigDecimal
 import java.util.Locale
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.pow
@@ -364,9 +363,8 @@ private fun Picker(
                 isProgrammaticScroll = isProgrammaticScroll
             )
         }
-            .distinctUntilChanged()
             .collect { snapshot ->
-            val centered = snapshot.centeredIndex ?: return@collect
+            val centered = snapshot.centeredIndex
             val centeredFloat = snapshot.centeredIndexFloat
             val previousFloat = previousCenteredIndexFloat
             previousCenteredIndexFloat = centeredFloat
@@ -384,15 +382,13 @@ private fun Picker(
                 // Only vibrate once per snapshot even if a fast fling crosses several ticks in
                 // one frame; still advance hapticIndex to the last crossed tick so later frames
                 // compare against the right baseline.
-                var latestHapticIndex: Int? = null
-                if (previousFloat != null && centeredFloat != null) {
-                    forEachCrossedAlignedIndex(previousFloat, centeredFloat, model.lastIndex) { index ->
-                        crossedAnyIndex = true
-                        if (index != hapticIndex) {
-                            latestHapticIndex = index
-                        }
-                    }
+                val crossed = if (previousFloat != null) {
+                    crossedAlignedIndices(previousFloat, centeredFloat)
+                } else {
+                    IntRange.EMPTY
                 }
+                crossedAnyIndex = !crossed.isEmpty()
+                var latestHapticIndex = lastCrossedIndexOtherThan(crossed, hapticIndex)
                 if (!crossedAnyIndex && alignedCentered != null && alignedCentered != hapticIndex) {
                     latestHapticIndex = alignedCentered
                 }
@@ -407,7 +403,7 @@ private fun Picker(
             if (snapshot.isProgrammaticScroll) return@collect
 
             // Emit when center line crosses tick centers even if exact aligned frames are skipped.
-            if (previousFloat != null && centeredFloat != null) {
+            if (previousFloat != null) {
                 forEachCrossedAlignedIndex(previousFloat, centeredFloat, model.lastIndex) { index ->
                     crossedAnyIndex = true
                     if (index != emittedIndex) {
@@ -1006,18 +1002,12 @@ object PickerDefaults {
 }
 
 private data class PickerSnapshot(
-    val centeredIndex: Int?,
-    val centeredIndexFloat: Float?,
+    val centeredIndex: Int,
+    val centeredIndexFloat: Float,
     val alignedCenteredIndex: Int?,
     val isScrolling: Boolean,
     val isProgrammaticScroll: Boolean
 )
-
-private enum class TickType {
-    Minor,
-    Medium,
-    Major
-}
 
 internal enum class PickerOrientation(
     val scrollableOrientation: Orientation
@@ -1324,10 +1314,13 @@ private fun rememberPickerSnapFlingBehavior(
     stepPx: () -> Float,
     maxIndex: () -> Int
 ): FlingBehavior {
+    val latestIndex by rememberUpdatedState(currentIndexFloat)
+    val latestSpacing by rememberUpdatedState(stepPx)
+    val latestMaxIndex by rememberUpdatedState(maxIndex)
     return remember(scrollableState) {
         object : FlingBehavior {
             override suspend fun ScrollScope.performFling(initialVelocity: Float): Float {
-                val spacingPx = stepPx().coerceAtLeast(1f)
+                val spacingPx = latestSpacing().coerceAtLeast(1f)
                 val velocityInSteps = abs(initialVelocity) / spacingPx
                 val projectedSteps = when {
                     velocityInSteps < 10f -> 0f
@@ -1339,12 +1332,12 @@ private fun rememberPickerSnapFlingBehavior(
                     else -> 0f
                 }
                 val targetIndex = (
-                    currentIndexFloat() + (direction * projectedSteps)
-                ).roundToInt().coerceIn(0, maxIndex())
+                    latestIndex() + (direction * projectedSteps)
+                ).roundToInt().coerceIn(0, latestMaxIndex())
                 var previousSnapValue = 0f
                 animate(
                     initialValue = 0f,
-                    targetValue = (currentIndexFloat() - targetIndex) * spacingPx,
+                    targetValue = (latestIndex() - targetIndex) * spacingPx,
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioNoBouncy,
                         stiffness = if (velocityInSteps >= 80f) {
@@ -1411,24 +1404,8 @@ private inline fun forEachCrossedAlignedIndex(
     maxIndex: Int,
     block: (Int) -> Unit
 ) {
-    if (from == to) return
-
-    if (to > from) {
-        val start = kotlin.math.floor(from).toInt() + 1
-        val end = kotlin.math.floor(to).toInt()
-        if (end >= start) {
-            for (index in start..end) {
-                block(index.coerceIn(0, maxIndex))
-            }
-        }
-    } else {
-        val start = kotlin.math.ceil(from).toInt() - 1
-        val end = kotlin.math.ceil(to).toInt()
-        if (start >= end) {
-            for (index in start downTo end) {
-                block(index.coerceIn(0, maxIndex))
-            }
-        }
+    for (index in crossedAlignedIndices(from, to)) {
+        block(index.coerceIn(0, maxIndex))
     }
 }
 
