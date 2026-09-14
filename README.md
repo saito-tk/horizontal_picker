@@ -132,7 +132,16 @@ fun ElapsedTimePicker() {
 
 厳密な「変化した 1 本のピクセルだけの更新」ではありません。**画面内と端の目盛りだけを再描画**します。`0..600` の 601 本すべてを生成し直すことはなく、更新量は全範囲ではなく表示幅と目盛り間隔に依存します。スクロール・サイズ・スタイルなどが変わった場合は、必要な描画情報を再計算します。描画負荷がゼロになる保証ではありません。
 
-設計の背景: [Compose の描画フェーズ](https://developer.android.com/develop/ui/compose/phases)、[描画キャッシュと graphicsLayer](https://developer.android.com/develop/ui/compose/graphics/draw/modifiers)。
+設計の背景: [Compose の描画フェーズ](https://developer.android.com/develop/ui/compose/phases)、[描画キャッシュと graphicsLayer](https://developer.android.com/develop/ui/compose/graphics/draw/modifiers)。実行例は sample アプリの先頭にあります。
+
+#### sample で確認する
+
+Android Studio で `sample` を選び、Android emulator で実行してください。先頭の暗い背景の「Live progress」で、`0..600` の進捗が毎秒 1 ずつ増えます。
+
+- `Pause` / `Resume`: 進捗の更新を一時停止・再開します。
+- `Reset`: 進捗を 0、選択値を 10 に戻し、始めの目盛りを見える位置にします。
+- `Show 55`: 進捗と選択値を 55 にして一時停止します。55 までの明るい目盛りと、それより先の通常色をすぐに比較できます。
+- ドラッグすると選択値だけが変わります。進捗は独立しているため、`Resume` 後も選択位置は自動で動きません。
 
 ### VerticalPicker
 

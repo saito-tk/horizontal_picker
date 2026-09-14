@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -20,11 +21,13 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -45,10 +48,12 @@ import com.saitotk.horizontalpicker.EdgeTapIndicatorStyle
 import com.saitotk.horizontalpicker.HorizontalPicker
 import com.saitotk.horizontalpicker.LabelStyle
 import com.saitotk.horizontalpicker.PickerContentRotation
+import com.saitotk.horizontalpicker.PickerProgress
 import com.saitotk.horizontalpicker.TickStyle
 import com.saitotk.horizontalpicker.VerticalPicker
 import java.util.Locale
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -81,6 +86,7 @@ private fun SampleScreen() {
         contentPadding = PaddingValues(vertical = 24.dp),
         verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
+        item { LiveProgressSection() }
         item { BitrateSection() }
         item { CountdownSection() }
         item { RotationVariantsSection() }
@@ -88,6 +94,72 @@ private fun SampleScreen() {
         item { DisabledStateSection() }
         item { ThemedPriceSection() }
     }
+}
+
+/** Progress is independent from the selected value. Only the draw lambda reads it. */
+@Composable
+private fun LiveProgressSection() {
+    var selected by rememberSaveable { mutableIntStateOf(10) }
+    val elapsed = rememberSaveable { mutableIntStateOf(0) }
+    var running by rememberSaveable { mutableStateOf(true) }
+    LaunchedEffect(running) {
+        while (running) {
+            delay(1_000)
+            if (elapsed.intValue < 600) elapsed.intValue++
+        }
+    }
+
+    Surface(
+        color = Color(0xFF20242E),
+        contentColor = Color.White,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(vertical = 20.dp)) {
+            Text(
+                "Live progress (0..600)",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(horizontal = 20.dp)
+            )
+            ProgressReadout(value = { elapsed.intValue })
+            Text(
+                "One tick per second. Drag to select independently.",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 20.dp)
+            )
+            HorizontalPicker(
+                value = selected,
+                onValueChange = { selected = it },
+                range = 0..600,
+                step = 1,
+                modifier = Modifier.fillMaxWidth().padding(top = 28.dp),
+                tick = TickStyle(
+                    minorColor = Color(0xFF666666),
+                    mediumColor = Color(0xFF888888),
+                    majorColor = Color(0xFFAAAAAA)
+                ),
+                label = LabelStyle(color = Color.White),
+                centerMarker = CenterMarkerStyle(color = Color(0xFF80CBC4)),
+                progress = PickerProgress(value = { elapsed.intValue.toFloat() })
+            )
+            Row(modifier = Modifier.padding(horizontal = 12.dp)) {
+                TextButton(onClick = { running = !running }) {
+                    Text(if (running) "Pause" else "Resume", color = Color.White)
+                }
+                TextButton(onClick = { elapsed.intValue = 0; selected = 10 }) { Text("Reset", color = Color.White) }
+                TextButton(onClick = { elapsed.intValue = 55; selected = 55; running = false }) {
+                    Text("Show 55", color = Color.White)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProgressReadout(value: () -> Int) {
+    Text(
+        text = "Progress: ${value()} / 600",
+        modifier = Modifier.padding(horizontal = 20.dp)
+    )
 }
 
 /**
