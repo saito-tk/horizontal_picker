@@ -79,3 +79,17 @@ git push origin v<version>
 例として `coordinates(..., "0.1.2")` に更新した場合は、`v0.1.2` を push して、そのタグを対象に GitHub Release を Publish します。Actions は `:picker:publishToMavenCentral` を実行して Central Portal へアップロードしますが、一般公開までは行いません。Deployments 画面で validation 結果を確認してから、手動で `Publish` を押してください。
 
 workflow 内で使用する GitHub Actions は、可変の version タグではなく commit SHA に固定しています。`.github/dependabot.yml` により、GitHub Actions の更新候補は毎月 Dependabot の PR として通知されます。更新 PR の内容を確認してから merge してください。
+
+### アップロード前の CI 障害からの復旧
+
+Android SDK のセットアップでは `platform-tools` を明示し、配布が終了した旧 `tools` パッケージを要求しません。
+
+既存リリースのアップロードが完了する前に CI の設定不備などで失敗した場合は、公開済みタグを動かさず、main の workflow を修正して手動実行できます。
+
+```bash
+gh workflow run publish-maven-central.yml --ref main -f release_tag=v0.2.0
+```
+
+手動実行でも、既存の公開済み GitHub Release に紐づくバージョンタグだけを受け付けます。ビルド対象は main ではなく指定タグのソースです。タグと Maven バージョンの一致確認、テスト、署名、Portal へのアップロードは通常の Release トリガーと共通です。一般公開は引き続き Portal で手動 Publish します。
+
+再実行前に前回のログと Portal の Deployments を確認してください。すでにアップロード済みの場合は重複送信せず、既存 Deployment を確認します。Maven Central 公開済みのバージョンは再利用できません。
