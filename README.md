@@ -17,7 +17,7 @@ Jetpack Compose 向けの目盛り式 Picker ライブラリです。中央の�
 
 ## 導入
 
-`0.1.1` は Maven Central で公開済みです。通常の Android プロジェクトはすでに `mavenCentral()` を設定済みなので、追加の repository 設定は不要です。
+以下は `0.2.0` の導入例です。Central Portal での Publish 完了・Maven Central への反映後に利用できます。通常の Android プロジェクトはすでに `mavenCentral()` を設定済みなので、追加の repository 設定は不要です。
 
 `mavenCentral()` が未設定のプロジェクトだけ、`settings.gradle.kts` の repository に追加してください。
 
@@ -34,7 +34,7 @@ dependencyResolutionManagement {
 
 ```kotlin
 dependencies {
-    implementation("io.github.saito-tk:horizontal-picker:0.1.1")
+    implementation("io.github.saito-tk:horizontal-picker:0.2.0")
 }
 ```
 
@@ -77,9 +77,9 @@ HorizontalPicker(
 )
 ```
 
-### 選択値とは別の進捗を目盛りで表示する（未リリース）
+### 選択値とは別の進捗を目盛りで表示する（0.2.0 以降）
 
-この機能はリポジトリの開発版に含まれます。Maven Central 公開済みの `0.1.1` にはまだ含まれません。
+この機能は `0.2.0` で追加されました。`0.1.1` には含まれません。
 
 既存の引数はそのままで、必要な場合だけ `progress` を追加できます。省略時（`null`）は従来の表示・操作のままです。横向き/縦向き、`Int`/`Float` のいずれでも使えます。
 
@@ -385,7 +385,7 @@ HorizontalPicker(
 - tick 数が極端に多い構成は拒否されます。`Too many ticks. Reduce range size or increase step.` が出た場合は、レンジを狭めるか `step` を大きくしてください。
 - tick/label の描画と `edgeTapZoneFraction` のタップ判定は絶対座標です。RTL レイアウトでもミラーリングされないため、RTL 対応が必要な画面では利用側でレイアウト方向を考慮してください。
 
-## 内部の軽量化（未リリース）
+## 内部の軽量化（0.2.0）
 
 既存の引数、スナップのばね設定・移動量、端タップ、選択値通知の順序を維持しながら、以下を最適化しています。
 
@@ -399,7 +399,7 @@ HorizontalPicker(
 
 ## 公開 API
 
-以下は開発版の API です。`progress` / `PickerProgress` は未リリースの追加項目です。
+以下は `0.2.0` の API です。`progress` / `PickerProgress` は `0.2.0` で追加されました。
 
 主な公開APIは `picker/src/main/java/com/saitotk/horizontalpicker/Picker.kt` にあります。ライブラリ名と package は `horizontalpicker` のままですが、利用側は用途に応じて `HorizontalPicker` または `VerticalPicker` を呼び分けます。
 
